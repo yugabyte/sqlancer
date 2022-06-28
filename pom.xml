@@ -285,6 +285,16 @@
       <version>42.4.0</version>
     </dependency>
     <dependency>
+      <groupId>com.ing.data</groupId>
+      <artifactId>cassandra-jdbc-wrapper</artifactId>
+      <version>4.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.yugabyte</groupId>
+      <artifactId>jdbc-yugabytedb</artifactId>
+      <version>42.3.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.xerial</groupId>
       <artifactId>sqlite-jdbc</artifactId>
       <version>3.36.0.3</version>
@@ -334,6 +344,11 @@
       <groupId>com.arangodb</groupId>
       <artifactId>arangodb-java-driver</artifactId>
       <version>6.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.typesafe</groupId>
+      <artifactId>config</artifactId>
+      <version>1.4.1</version>
     </dependency>
   </dependencies>
   <reporting>

@@ -1,5 +1,7 @@
 package sqlancer;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 
@@ -50,8 +52,8 @@ public class MainOptions {
     @Parameter(names = "--password", description = "The password used to log into the DBMS")
     private String password = "sqlancer"; // NOPMD
 
-    @Parameter(names = "--host", description = "The host used to log into the DBMS")
-    private String host = null; // NOPMD
+    @Parameter(names = "--hosts", description = "List of hosts used to log into the DBMS")
+    private String hosts = null; // NOPMD
 
     @Parameter(names = "--port", description = "The port used to log into the DBMS")
     private int port = MainOptions.NO_SET_PORT; // NOPMD
@@ -159,7 +161,9 @@ public class MainOptions {
     }
 
     public String getHost() {
-        return host;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        String[] listOfHosts = hosts.split(",");
+        return listOfHosts[random.nextInt(listOfHosts.length)];
     }
 
     public int getPort() {

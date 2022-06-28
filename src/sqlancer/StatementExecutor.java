@@ -29,8 +29,12 @@ public class StatementExecutor<G extends GlobalState<?, ?, ?>, A extends Abstrac
         this.queryConsumer = queryConsumer;
     }
 
-    @SuppressWarnings("unchecked")
     public void executeStatements() throws Exception {
+        executeStatements(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void executeStatements(boolean countQueries) throws Exception {
         Randomly r = globalState.getRandomly();
         int[] nrRemaining = new int[actions.length];
         List<A> availableActions = new ArrayList<>();
@@ -68,6 +72,9 @@ public class StatementExecutor<G extends GlobalState<?, ?, ?>, A extends Abstrac
                 do {
                     query = nextAction.getQuery(globalState);
                     success = globalState.executeStatement(query);
+                    if (countQueries) {
+                        globalState.getManager().incrementSelectQueryCount();
+                    }
                 } while (nextAction.canBeRetried() && !success
                         && nrTries++ < globalState.getOptions().getNrStatementRetryCount());
             } catch (IgnoreMeException e) {
