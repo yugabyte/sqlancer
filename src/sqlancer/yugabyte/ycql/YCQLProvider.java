@@ -1,7 +1,7 @@
 package sqlancer.yugabyte.ycql;
 
 import static sqlancer.yugabyte.ycql.YCQLSchema.getTableNames;
-import static sqlancer.yugabyte.ysql.YSQLProvider.DDL_LOCK;
+import static sqlancer.yugabyte.ysql.YSQLProvider.GLOBAL_DDL_LOCK;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -70,19 +70,19 @@ public class YCQLProvider extends SQLProviderAdapter<YCQLGlobalState, YCQLOption
     private static int mapActions(YCQLGlobalState globalState, Action a) {
         Randomly r = globalState.getRandomly();
         switch (a) {
-        case ALTER:
-            return r.getInteger(0, 10);
-        case INSERT:
-            return r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
-        case CREATE_INDEX:
-        case UPDATE:
-            return r.getInteger(0, globalState.getDbmsSpecificOptions().maxNumUpdates + 1);
-        case EXPLAIN:
-            return r.getInteger(0, 2);
-        case DELETE:
-            return r.getInteger(0, globalState.getDbmsSpecificOptions().maxNumDeletes + 1);
-        default:
-            throw new AssertionError(a);
+            case ALTER:
+                return r.getInteger(0, 10);
+            case INSERT:
+                return r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+            case CREATE_INDEX:
+            case UPDATE:
+                return r.getInteger(0, globalState.getDbmsSpecificOptions().maxNumUpdates + 1);
+            case EXPLAIN:
+                return r.getInteger(0, 2);
+            case DELETE:
+                return r.getInteger(0, globalState.getDbmsSpecificOptions().maxNumDeletes + 1);
+            default:
+                throw new AssertionError(a);
         }
     }
 
@@ -109,10 +109,10 @@ public class YCQLProvider extends SQLProviderAdapter<YCQLGlobalState, YCQLOption
         }
         StatementExecutor<YCQLGlobalState, Action> se = new StatementExecutor<>(globalState, Action.values(),
                 YCQLProvider::mapActions, (q) -> {
-                    if (globalState.getSchema().getDatabaseTables().isEmpty()) {
-                        throw new IgnoreMeException();
-                    }
-                });
+            if (globalState.getSchema().getDatabaseTables().isEmpty()) {
+                throw new IgnoreMeException();
+            }
+        });
         se.executeStatements();
     }
 
@@ -138,24 +138,26 @@ public class YCQLProvider extends SQLProviderAdapter<YCQLGlobalState, YCQLOption
         final Connection connection = DriverManager.getConnection(
                 String.format(url, host, port, "system_schema", globalState.getDbmsSpecificOptions().datacenter));
 
-        synchronized (DDL_LOCK) {
-            try (Statement stmt = connection.createStatement()) {
-                try {
-                    stmt.execute("DROP KEYSPACE IF EXISTS " + globalState.getDatabaseName());
-                } catch (Exception se) {
-                    // try again
-                    List<String> tableNames = getTableNames(
-                            new SQLConnection(DriverManager.getConnection(String.format(url, host, port,
-                                    globalState.getDatabaseName(), globalState.getDbmsSpecificOptions().datacenter))),
-                            globalState.getDatabaseName());
-                    for (String tableName : tableNames) {
-                        stmt.execute("DROP TABLE " + globalState.getDatabaseName() + "." + tableName);
-                    }
-                    stmt.execute("DROP KEYSPACE IF EXISTS " + globalState.getDatabaseName());
-                }
+        try (Statement stmt = connection.createStatement()) {
+            GLOBAL_DDL_LOCK.lock();
 
-                stmt.execute("CREATE KEYSPACE IF NOT EXISTS " + globalState.getDatabaseName());
+            try {
+                stmt.execute("DROP KEYSPACE IF EXISTS " + globalState.getDatabaseName());
+            } catch (Exception se) {
+                // try again
+                List<String> tableNames = getTableNames(
+                        new SQLConnection(DriverManager.getConnection(String.format(url, host, port,
+                                globalState.getDatabaseName(), globalState.getDbmsSpecificOptions().datacenter))),
+                        globalState.getDatabaseName());
+                for (String tableName : tableNames) {
+                    stmt.execute("DROP TABLE " + globalState.getDatabaseName() + "." + tableName);
+                }
+                stmt.execute("DROP KEYSPACE IF EXISTS " + globalState.getDatabaseName());
             }
+
+            stmt.execute("CREATE KEYSPACE IF NOT EXISTS " + globalState.getDatabaseName());
+        } finally {
+            GLOBAL_DDL_LOCK.unlock();
         }
 
         return new SQLConnection(DriverManager.getConnection(String.format(url, host, port,

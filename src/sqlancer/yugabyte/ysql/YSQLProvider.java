@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.auto.service.AutoService;
 
@@ -44,7 +45,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLViewGenerator;
 public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOptions> {
 
     // TODO Due to yugabyte problems with parallel DDL we need this lock object
-    public static final Object DDL_LOCK = new Object();
+    public static final ReentrantLock GLOBAL_DDL_LOCK = new ReentrantLock();
     /**
      * Generate only data types and expressions that are understood by PQS.
      */
@@ -71,49 +72,49 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         Randomly r = globalState.getRandomly();
         int nrPerformed;
         switch (a) {
-        case CREATE_INDEX:
-            nrPerformed = r.getInteger(0, 3);
-            break;
-        case DISCARD:
-        case DROP_INDEX:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case COMMIT:
-            nrPerformed = r.getInteger(0, 0);
-            break;
-        case ALTER_TABLE:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case RESET:
-            nrPerformed = r.getInteger(0, 3);
-            break;
-        case ANALYZE:
-            nrPerformed = r.getInteger(0, 3);
-            break;
-        case DELETE:
-        case RESET_ROLE:
-        case VACUUM:
-        case SET_CONSTRAINTS:
-        case SET:
-        case COMMENT_ON:
-        case NOTIFY:
-        case LISTEN:
-        case UNLISTEN:
-        case CREATE_SEQUENCE:
-        case TRUNCATE:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case CREATE_VIEW:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case UPDATE:
-            nrPerformed = r.getInteger(0, 10);
-            break;
-        case INSERT:
-            nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
-            break;
-        default:
-            throw new AssertionError(a);
+            case CREATE_INDEX:
+                nrPerformed = r.getInteger(0, 3);
+                break;
+            case DISCARD:
+            case DROP_INDEX:
+                nrPerformed = r.getInteger(0, 5);
+                break;
+            case COMMIT:
+                nrPerformed = r.getInteger(0, 0);
+                break;
+            case ALTER_TABLE:
+                nrPerformed = r.getInteger(0, 5);
+                break;
+            case RESET:
+                nrPerformed = r.getInteger(0, 3);
+                break;
+            case ANALYZE:
+                nrPerformed = r.getInteger(0, 3);
+                break;
+            case DELETE:
+            case RESET_ROLE:
+            case VACUUM:
+            case SET_CONSTRAINTS:
+            case SET:
+            case COMMENT_ON:
+            case NOTIFY:
+            case LISTEN:
+            case UNLISTEN:
+            case CREATE_SEQUENCE:
+            case TRUNCATE:
+                nrPerformed = r.getInteger(0, 2);
+                break;
+            case CREATE_VIEW:
+                nrPerformed = r.getInteger(0, 2);
+                break;
+            case UPDATE:
+                nrPerformed = r.getInteger(0, 10);
+                break;
+            case INSERT:
+                nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+                break;
+            default:
+                throw new AssertionError(a);
         }
         return nrPerformed;
 
@@ -195,21 +196,41 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 
     // for some reason yugabyte unable to create few databases simultaneously
     private void createDatabaseSync(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
-        synchronized (DDL_LOCK) {
-            exceptionLessSleep(5000);
+        try {
+            GLOBAL_DDL_LOCK.lock();
 
-            Connection con = createConnectionSafely(entryURL, username, password);
-            globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
-            globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
-            createDatabaseCommand = getCreateDatabaseCommand(globalState);
-            globalState.getState().logStatement(createDatabaseCommand);
-            try (Statement s = con.createStatement()) {
-                s.execute("DROP DATABASE IF EXISTS " + databaseName);
+            int count = 5;
+            boolean created = false;
+
+            SQLException se = null;
+            while (count > 0) {
+                count--;
+                try {
+                    exceptionLessSleep(1000);
+
+                    Connection con = createConnectionSafely(entryURL, username, password);
+                    globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
+                    globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
+                    createDatabaseCommand = getCreateDatabaseCommand(globalState);
+                    globalState.getState().logStatement(createDatabaseCommand);
+                    try (Statement s = con.createStatement()) {
+                        s.execute("DROP DATABASE IF EXISTS " + databaseName);
+                    }
+                    try (Statement s = con.createStatement()) {
+                        s.execute(createDatabaseCommand);
+                    }
+                    con.close();
+
+                    created = true;
+                    break;
+                } catch (SQLException lastException) {
+                    se = lastException;
+                }
             }
-            try (Statement s = con.createStatement()) {
-                s.execute(createDatabaseCommand);
-            }
-            con.close();
+
+            if (!created) throw se;
+        } finally {
+            GLOBAL_DDL_LOCK.unlock();
         }
     }
 
@@ -244,22 +265,23 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     }
 
     protected void createTables(YSQLGlobalState globalState, int numTables) throws Exception {
-        synchronized (DDL_LOCK) {
-            boolean prevCreationFailed = false; // small optimization - wait only after failed requests
-            while (globalState.getSchema().getDatabaseTables().size() < numTables) {
-                if (!prevCreationFailed) {
-                    exceptionLessSleep(5000);
-                }
+        while (globalState.getSchema().getDatabaseTables().size() < numTables) {
+            try {
+                String tableName = DBMSCommon.createTableName(globalState.getSchema().getDatabaseTables().size());
+                SQLQueryAdapter createTable = YSQLTableGenerator.generate(tableName, generateOnlyKnown,
+                        globalState);
 
-                try {
-                    String tableName = DBMSCommon.createTableName(globalState.getSchema().getDatabaseTables().size());
-                    SQLQueryAdapter createTable = YSQLTableGenerator.generate(tableName, generateOnlyKnown,
-                            globalState);
-                    globalState.executeStatement(createTable);
-                    prevCreationFailed = false;
-                } catch (IgnoreMeException e) {
-                    prevCreationFailed = true;
+                boolean executed = false;
+                while (!executed) {
+                    if (!GLOBAL_DDL_LOCK.isLocked()) {
+                        executed = true;
+                        globalState.executeStatement(createTable);
+                    } else {
+                        Thread.sleep(100);
+                    }
                 }
+            } catch (IgnoreMeException e) {
+                // do nothing
             }
         }
     }
@@ -275,10 +297,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     protected void prepareTables(YSQLGlobalState globalState) throws Exception {
         StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, Action.values(),
                 YSQLProvider::mapActions, (q) -> {
-                    if (globalState.getSchema().getDatabaseTables().isEmpty()) {
-                        throw new IgnoreMeException();
-                    }
-                });
+            if (globalState.getSchema().getDatabaseTables().isEmpty()) {
+                throw new IgnoreMeException();
+            }
+        });
         se.executeStatements();
         globalState.executeStatement(new SQLQueryAdapter("COMMIT", true));
         globalState.executeStatement(new SQLQueryAdapter("SET SESSION statement_timeout = 15000;\n"));
@@ -340,9 +362,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         RESET_ROLE((g) -> new SQLQueryAdapter("RESET ROLE")), //
         COMMENT_ON(YSQLCommentGenerator::generate), //
         RESET((g) -> new SQLQueryAdapter("RESET ALL") /*
-                                                       * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
-                                                       * configuration parameter
-                                                       */), //
+         * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
+         * configuration parameter
+         */), //
         NOTIFY(YSQLNotifyGenerator::createNotify), //
         LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
         UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
