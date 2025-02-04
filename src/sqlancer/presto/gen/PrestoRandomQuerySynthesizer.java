@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
-import sqlancer.common.ast.newast.Node;
-import sqlancer.common.ast.newast.TableReferenceNode;
 import sqlancer.presto.PrestoGlobalState;
 import sqlancer.presto.PrestoSchema;
 import sqlancer.presto.PrestoSchema.PrestoTable;
@@ -15,6 +13,7 @@ import sqlancer.presto.ast.PrestoConstant;
 import sqlancer.presto.ast.PrestoExpression;
 import sqlancer.presto.ast.PrestoJoin;
 import sqlancer.presto.ast.PrestoSelect;
+import sqlancer.presto.ast.PrestoTableReference;
 
 public final class PrestoRandomQuerySynthesizer {
 
@@ -29,10 +28,10 @@ public final class PrestoRandomQuerySynthesizer {
         // TODO: distinct
         // select.setDistinct(Randomly.getBoolean());
         // boolean allowAggregates = Randomly.getBooleanWithSmallProbability();
-        List<Node<PrestoExpression>> columns = new ArrayList<>();
+        List<PrestoExpression> columns = new ArrayList<>();
         for (int i = 0; i < nrColumns; i++) {
             // if (allowAggregates && Randomly.getBoolean()) {
-            Node<PrestoExpression> expression = gen
+            PrestoExpression expression = gen
                     .generateExpression(PrestoSchema.PrestoCompositeDataType.getRandomWithoutNull());
             columns.add(expression);
             // } else {
@@ -41,16 +40,17 @@ public final class PrestoRandomQuerySynthesizer {
         }
         select.setFetchColumns(columns);
         List<PrestoTable> tables = targetTables.getTables();
-        List<TableReferenceNode<PrestoExpression, PrestoTable>> tableList = tables.stream()
-                .map(t -> new TableReferenceNode<PrestoExpression, PrestoTable>(t)).collect(Collectors.toList());
-        List<Node<PrestoExpression>> joins = PrestoJoin.getJoins(tableList, globalState);
+        List<PrestoTableReference> tableList = tables.stream().map(t -> new PrestoTableReference(t))
+                .collect(Collectors.toList());
+        List<PrestoExpression> joins = PrestoJoin.getJoins(tableList, globalState).stream()
+                .collect(Collectors.toList());
         select.setJoinList(new ArrayList<>(joins));
         select.setFromList(new ArrayList<>(tableList));
         if (Randomly.getBoolean()) {
             select.setWhereClause(gen.generateExpression(PrestoSchema.PrestoCompositeDataType.getRandomWithoutNull()));
         }
         if (Randomly.getBoolean()) {
-            select.setOrderByExpressions(gen.generateOrderBys());
+            select.setOrderByClauses(gen.generateOrderBys());
         }
         if (Randomly.getBoolean()) {
             select.setGroupByExpressions(gen.generateExpressions(Randomly.smallNumber() + 1));
@@ -61,7 +61,8 @@ public final class PrestoRandomQuerySynthesizer {
         }
         // if (Randomly.getBoolean()) {
         // select.setOffsetClause(
-        // PrestoConstant.createIntConstant(Randomly.getNotCachedInteger(0, Integer.MAX_VALUE)));
+        // PrestoConstant.createIntConstant(Randomly.getNotCachedInteger(0,
+        // Integer.MAX_VALUE)));
         // }
         if (Randomly.getBoolean()) {
             select.setHavingClause(gen.generateHavingClause());

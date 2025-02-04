@@ -2,14 +2,18 @@ package sqlancer.cockroachdb.gen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
+import sqlancer.cockroachdb.CockroachDBBugs;
 import sqlancer.cockroachdb.CockroachDBCommon;
 import sqlancer.cockroachdb.CockroachDBProvider.CockroachDBGlobalState;
 import sqlancer.cockroachdb.CockroachDBSchema.CockroachDBColumn;
 import sqlancer.cockroachdb.CockroachDBSchema.CockroachDBCompositeDataType;
 import sqlancer.cockroachdb.CockroachDBSchema.CockroachDBDataType;
+import sqlancer.cockroachdb.CockroachDBSchema.CockroachDBTable;
+import sqlancer.cockroachdb.CockroachDBVisitor;
 import sqlancer.cockroachdb.ast.CockroachDBAggregate;
 import sqlancer.cockroachdb.ast.CockroachDBAggregate.CockroachDBAggregateFunction;
 import sqlancer.cockroachdb.ast.CockroachDBBetweenOperation;
@@ -29,6 +33,8 @@ import sqlancer.cockroachdb.ast.CockroachDBConstant;
 import sqlancer.cockroachdb.ast.CockroachDBExpression;
 import sqlancer.cockroachdb.ast.CockroachDBFunction;
 import sqlancer.cockroachdb.ast.CockroachDBInOperation;
+import sqlancer.cockroachdb.ast.CockroachDBJoin;
+import sqlancer.cockroachdb.ast.CockroachDBJoin.JoinType;
 import sqlancer.cockroachdb.ast.CockroachDBMultiValuedComparison;
 import sqlancer.cockroachdb.ast.CockroachDBMultiValuedComparison.MultiValuedComparisonOperator;
 import sqlancer.cockroachdb.ast.CockroachDBMultiValuedComparison.MultiValuedComparisonType;
@@ -36,14 +42,24 @@ import sqlancer.cockroachdb.ast.CockroachDBNotOperation;
 import sqlancer.cockroachdb.ast.CockroachDBOrderingTerm;
 import sqlancer.cockroachdb.ast.CockroachDBRegexOperation;
 import sqlancer.cockroachdb.ast.CockroachDBRegexOperation.CockroachDBRegexOperator;
+import sqlancer.cockroachdb.ast.CockroachDBSelect;
+import sqlancer.cockroachdb.ast.CockroachDBTableReference;
 import sqlancer.cockroachdb.ast.CockroachDBTypeAnnotation;
 import sqlancer.cockroachdb.ast.CockroachDBUnaryPostfixOperation;
 import sqlancer.cockroachdb.ast.CockroachDBUnaryPostfixOperation.CockroachDBUnaryPostfixOperator;
+import sqlancer.common.gen.CERTGenerator;
+import sqlancer.common.gen.NoRECGenerator;
+import sqlancer.common.gen.TLPWhereGenerator;
 import sqlancer.common.gen.TypedExpressionGenerator;
+import sqlancer.common.schema.AbstractTables;
 
-public class CockroachDBExpressionGenerator
-        extends TypedExpressionGenerator<CockroachDBExpression, CockroachDBColumn, CockroachDBCompositeDataType> {
+public class CockroachDBExpressionGenerator extends
+        TypedExpressionGenerator<CockroachDBExpression, CockroachDBColumn, CockroachDBCompositeDataType> implements
+        NoRECGenerator<CockroachDBSelect, CockroachDBJoin, CockroachDBExpression, CockroachDBTable, CockroachDBColumn>,
+        TLPWhereGenerator<CockroachDBSelect, CockroachDBJoin, CockroachDBExpression, CockroachDBTable, CockroachDBColumn>,
+        CERTGenerator<CockroachDBSelect, CockroachDBJoin, CockroachDBExpression, CockroachDBTable, CockroachDBColumn> {
 
+    private List<CockroachDBTable> tables;
     private final CockroachDBGlobalState globalState;
 
     public CockroachDBExpressionGenerator(CockroachDBGlobalState globalState) {
@@ -84,7 +100,8 @@ public class CockroachDBExpressionGenerator
 
     @Override
     public CockroachDBExpression generateExpression(CockroachDBCompositeDataType type, int depth) {
-        // if (type == CockroachDBDataType.FLOAT && Randomly.getBooleanWithRatherLowProbability()) {
+        // if (type == CockroachDBDataType.FLOAT &&
+        // Randomly.getBooleanWithRatherLowProbability()) {
         // type = CockroachDBDataType.INT;
         // }
         if (allowAggregates && Randomly.getBoolean()) {
@@ -358,4 +375,227 @@ public class CockroachDBExpressionGenerator
         return new CockroachDBUnaryPostfixOperation(expr, CockroachDBUnaryPostfixOperator.IS_NULL);
     }
 
+    @Override
+    public CockroachDBExpressionGenerator setTablesAndColumns(
+            AbstractTables<CockroachDBTable, CockroachDBColumn> tables) {
+        this.columns = tables.getColumns();
+        this.tables = tables.getTables();
+
+        return this;
+    }
+
+    @Override
+    public CockroachDBExpression generateBooleanExpression() {
+        return generateExpression(CockroachDBDataType.BOOL.get());
+    }
+
+    @Override
+    public CockroachDBSelect generateSelect() {
+        return new CockroachDBSelect();
+    }
+
+    @Override
+    public List<CockroachDBJoin> getRandomJoinClauses() {
+        List<CockroachDBJoin> joinExpressions = new ArrayList<>();
+        List<CockroachDBTableReference> tableReferences = tables.stream().map(t -> new CockroachDBTableReference(t))
+                .collect(Collectors.toList());
+        while (tableReferences.size() >= 2 && Randomly.getBoolean()) {
+            CockroachDBTableReference leftTable = tableReferences.remove(0);
+            CockroachDBTableReference rightTable = tableReferences.remove(0);
+            List<CockroachDBColumn> columns = new ArrayList<>(leftTable.getTable().getColumns());
+            columns.addAll(rightTable.getTable().getColumns());
+            CockroachDBExpressionGenerator joinGen = new CockroachDBExpressionGenerator(globalState)
+                    .setColumns(columns);
+            joinExpressions.add(CockroachDBJoin.createJoin(leftTable, rightTable, CockroachDBJoin.JoinType.getRandom(),
+                    joinGen.generateExpression(CockroachDBDataType.BOOL.get())));
+        }
+
+        tables = tableReferences.stream().map(t -> t.getTable()).collect(Collectors.toList());
+        return joinExpressions;
+    }
+
+    @Override
+    public List<CockroachDBExpression> getTableRefs() {
+        List<CockroachDBTableReference> tableReferences = tables.stream().map(t -> new CockroachDBTableReference(t))
+                .collect(Collectors.toList());
+
+        return CockroachDBCommon.getTableReferences(tableReferences);
+    }
+
+    @Override
+    public String generateOptimizedQueryString(CockroachDBSelect select, CockroachDBExpression whereCondition,
+            boolean shouldUseAggregate) {
+        CockroachDBColumn c = new CockroachDBColumn("COUNT(*)", null, false, false);
+        select.setWhereClause(whereCondition);
+        if (shouldUseAggregate) {
+            CockroachDBAggregate aggr = new CockroachDBAggregate(CockroachDBAggregateFunction.COUNT,
+                    List.of(new CockroachDBColumnReference(new CockroachDBColumn("*",
+                            new CockroachDBCompositeDataType(CockroachDBDataType.INT, 0), false, false))));
+            select.setFetchColumns(List.of(aggr));
+        } else {
+            select.setFetchColumns(List.of(new CockroachDBColumnReference(c)));
+            if (Randomly.getBooleanWithRatherLowProbability()) {
+                select.setOrderByClauses(getOrderingTerms());
+            }
+        }
+        return CockroachDBVisitor.asString(select);
+    }
+
+    @Override
+    public String generateUnoptimizedQueryString(CockroachDBSelect select, CockroachDBExpression whereCondition) {
+        List<CockroachDBExpression> tableList = select.getFromList();
+        List<CockroachDBExpression> joinList = select.getJoinList();
+        String fromString = tableList.stream().map(t -> ((CockroachDBTableReference) t).getTable().getName())
+                .collect(Collectors.joining(", "));
+        if (!tableList.isEmpty() && !joinList.isEmpty()) {
+            fromString += ", ";
+        }
+        return "SELECT SUM(count) FROM (SELECT CAST(" + CockroachDBVisitor.asString(whereCondition)
+                + " IS TRUE AS INT) as count FROM " + fromString + " "
+                + joinList.stream().map(j -> CockroachDBVisitor.asString(j)).collect(Collectors.joining(", ")) + ")";
+    }
+
+    @Override
+    public List<CockroachDBExpression> generateFetchColumns(boolean shouldCreateDummy) {
+        if (shouldCreateDummy || columns.size() == 0) {
+            return List.of(new CockroachDBColumnReference(new CockroachDBColumn("*", null, false, false)));
+        }
+        return Randomly.nonEmptySubset(columns).stream().map(c -> new CockroachDBColumnReference(c))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public String generateExplainQuery(CockroachDBSelect select) {
+        return "EXPLAIN " + select.asString();
+    }
+
+    @Override
+    public boolean mutate(CockroachDBSelect select) {
+        List<Function<CockroachDBSelect, Boolean>> mutators = new ArrayList<>();
+
+        if (!CockroachDBBugs.bug131647) {
+            mutators.add(this::mutateJoin);
+        }
+        mutators.add(this::mutateGroupBy);
+        mutators.add(this::mutateHaving);
+        mutators.add(this::mutateAnd);
+        if (!CockroachDBBugs.bug131640) {
+            mutators.add(this::mutateWhere);
+            mutators.add(this::mutateOr);
+        }
+        // mutators.add(this::mutateLimit);
+        mutators.add(this::mutateDistinct);
+
+        return Randomly.fromList(mutators).apply(select);
+    }
+
+    boolean mutateJoin(CockroachDBSelect select) {
+        if (select.getJoinList().isEmpty()) {
+            return false;
+        }
+
+        CockroachDBJoin join = (CockroachDBJoin) Randomly.fromList(select.getJoinList());
+
+        // CROSS does not need ON Condition, while other joins do
+        // To avoid Null pointer, generating a new new condition when mutating CROSS to other joins
+        if (join.getJoinType() == JoinType.CROSS) {
+            List<CockroachDBColumn> columns = new ArrayList<>();
+            columns.addAll(((CockroachDBTableReference) join.getLeftTable()).getTable().getColumns());
+            columns.addAll(((CockroachDBTableReference) join.getRightTable()).getTable().getColumns());
+            CockroachDBExpressionGenerator joinGen2 = new CockroachDBExpressionGenerator(globalState)
+                    .setColumns(columns);
+            join.setOnClause(joinGen2.generateExpression(CockroachDBDataType.BOOL.get()));
+        }
+
+        JoinType newJoinType = CockroachDBJoin.JoinType.INNER;
+        if (join.getJoinType() == JoinType.LEFT || join.getJoinType() == JoinType.RIGHT) { // No invariant relation
+                                                                                           // between LEFT and RIGHT
+                                                                                           // join
+            newJoinType = CockroachDBJoin.JoinType.getRandomExcept(JoinType.NATURAL, JoinType.CROSS, JoinType.LEFT,
+                    JoinType.RIGHT);
+        } else if (join.getJoinType() == JoinType.FULL) {
+            newJoinType = CockroachDBJoin.JoinType.getRandomExcept(JoinType.NATURAL, JoinType.CROSS);
+        } else if (join.getJoinType() != JoinType.CROSS) {
+            newJoinType = CockroachDBJoin.JoinType.getRandomExcept(JoinType.NATURAL, join.getJoinType());
+        }
+        assert newJoinType != JoinType.NATURAL; // Natural Join is not supported for CERT
+        boolean increase = join.getJoinType().ordinal() < newJoinType.ordinal();
+        join.setJoinType(newJoinType);
+        return increase;
+    }
+
+    boolean mutateDistinct(CockroachDBSelect select) {
+        boolean increase = select.isDistinct();
+        select.setDistinct(!select.isDistinct());
+        return increase;
+    }
+
+    boolean mutateWhere(CockroachDBSelect select) {
+        boolean increase = select.getWhereClause() != null;
+        if (increase) {
+            select.setWhereClause(null);
+        } else {
+            select.setWhereClause(generateExpression(CockroachDBDataType.BOOL.get()));
+        }
+        return increase;
+    }
+
+    boolean mutateGroupBy(CockroachDBSelect select) {
+        boolean increase = select.getGroupByExpressions().size() > 0;
+        if (increase) {
+            select.clearGroupByExpressions();
+        } else {
+            select.setGroupByExpressions(select.getFetchColumns());
+        }
+        return increase;
+    }
+
+    boolean mutateHaving(CockroachDBSelect select) {
+        if (select.getGroupByExpressions().size() == 0) {
+            select.setGroupByExpressions(select.getFetchColumns());
+            select.setHavingClause(generateExpression(CockroachDBDataType.BOOL.get()));
+            return false;
+        } else {
+            if (select.getHavingClause() == null) {
+                select.setHavingClause(generateExpression(CockroachDBDataType.BOOL.get()));
+                return false;
+            } else {
+                select.setHavingClause(null);
+                return true;
+            }
+        }
+    }
+
+    boolean mutateAnd(CockroachDBSelect select) {
+        if (select.getWhereClause() == null) {
+            select.setWhereClause(generateExpression(CockroachDBDataType.BOOL.get()));
+        } else {
+            CockroachDBExpression newWhere = new CockroachDBBinaryLogicalOperation(select.getWhereClause(),
+                    generateExpression(CockroachDBDataType.BOOL.get()), CockroachDBBinaryLogicalOperator.AND);
+            select.setWhereClause(newWhere);
+        }
+        return false;
+    }
+
+    boolean mutateOr(CockroachDBSelect select) {
+        if (select.getWhereClause() == null) {
+            select.setWhereClause(generateExpression(CockroachDBDataType.BOOL.get()));
+            return false;
+        } else {
+            CockroachDBExpression newWhere = new CockroachDBBinaryLogicalOperation(select.getWhereClause(),
+                    generateExpression(CockroachDBDataType.BOOL.get()), CockroachDBBinaryLogicalOperator.OR);
+            select.setWhereClause(newWhere);
+            return true;
+        }
+    }
+
+    boolean mutateLimit(CockroachDBSelect select) {
+        boolean increase = select.getLimitClause() != null;
+        if (increase) {
+            select.setLimitClause(null);
+        } else {
+            select.setLimitClause(generateConstant(CockroachDBDataType.INT.get()));
+        }
+        return increase;
+    }
 }

@@ -134,8 +134,8 @@ public class YSQLPivotedQuerySynthesisOracle
             YSQLExpression offsetClause = generateOffset();
             selectStatement.setOffsetClause(offsetClause);
         }
-        List<YSQLExpression> orderBy = new YSQLExpressionGenerator(globalState).setColumns(columns).generateOrderBy();
-        selectStatement.setOrderByExpressions(orderBy);
+        List<YSQLExpression> orderBy = new YSQLExpressionGenerator(globalState).setColumns(columns).generateOrderBys();
+        selectStatement.setOrderByClauses(orderBy);
         return new SQLQueryAdapter(YSQLVisitor.asString(selectStatement));
     }
 

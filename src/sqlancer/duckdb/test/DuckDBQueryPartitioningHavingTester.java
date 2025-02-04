@@ -7,7 +7,6 @@ import java.util.List;
 
 import sqlancer.ComparatorHelper;
 import sqlancer.Randomly;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.duckdb.DuckDBErrors;
 import sqlancer.duckdb.DuckDBProvider.DuckDBGlobalState;
@@ -30,7 +29,7 @@ public class DuckDBQueryPartitioningHavingTester extends DuckDBQueryPartitioning
         }
         boolean orderBy = Randomly.getBoolean();
         if (orderBy) {
-            select.setOrderByExpressions(gen.generateOrderBys());
+            select.setOrderByClauses(gen.generateOrderBys());
         }
         select.setGroupByExpressions(gen.generateExpressions(Randomly.smallNumber() + 1));
         select.setHavingClause(null);
@@ -51,12 +50,12 @@ public class DuckDBQueryPartitioningHavingTester extends DuckDBQueryPartitioning
     }
 
     @Override
-    protected Node<DuckDBExpression> generatePredicate() {
+    protected DuckDBExpression generatePredicate() {
         return gen.generateHavingClause();
     }
 
     @Override
-    List<Node<DuckDBExpression>> generateFetchColumns() {
+    List<DuckDBExpression> generateFetchColumns() {
         return Arrays.asList(gen.generateHavingClause());
     }
 

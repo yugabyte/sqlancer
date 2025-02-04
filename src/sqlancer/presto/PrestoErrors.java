@@ -1,5 +1,8 @@
 package sqlancer.presto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import sqlancer.common.query.ExpectedErrors;
 
 public final class PrestoErrors {
@@ -7,7 +10,11 @@ public final class PrestoErrors {
     private PrestoErrors() {
     }
 
-    public static void addExpressionErrors(ExpectedErrors errors) {
+    public static List<String> getExpressionErrors() {
+        ArrayList<String> errors = new ArrayList<>();
+
+        errors.addAll(getFunctionErrors());
+
         // Presto errors
         errors.add("cannot be applied to");
         errors.add("LIKE expression must evaluate to a varchar");
@@ -20,6 +27,7 @@ public final class PrestoErrors {
         // -179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0000)
         // AS BIGINT)as count FROM t0) as res
         errors.add("Decimal overflow");
+        errors.add("long overflow");
         errors.add("multiplication overflow");
         errors.add("addition overflow");
         errors.add("subtraction overflow");
@@ -33,7 +41,11 @@ public final class PrestoErrors {
 
         // TODO: check
         errors.add("io.airlift.slice.Slice cannot be cast to java.lang.Number");
-        errors.add("Cannot cast java.lang.Long to io.airlift.slice.Slice");
+        errors.add("class io.airlift.slice.Slice cannot be cast to class java.lang.Number");
+        if (PrestoBugs.bug23324) {
+            errors.add("Cannot cast java.lang.Long to io.airlift.slice.Slice");
+        }
+        errors.add("Cannot cast java.lang.String to java.util.List");
         errors.add("Unexpected subquery expression in logical plan");
 
         // 9223372036854775808
@@ -46,10 +58,6 @@ public final class PrestoErrors {
         errors.add("Cannot add hour, minutes or seconds to a date");
 
         errors.add("DECIMAL scale must be in range");
-        errors.add("multiplication overflow");
-        errors.add("addition overflow");
-        errors.add("subtraction overflow");
-        errors.add("Decimal overflow");
         errors.add("IN value and list items must be the same type");
         errors.add("is not a valid timestamp literal");
         errors.add("Unknown time-zone ID");
@@ -57,9 +65,36 @@ public final class PrestoErrors {
 
         // ARRAY
         errors.add("Unknown type: ARRAY");
+
+        // SELECT
+        errors.add("WHERE clause must evaluate to a boolean");
+        errors.add("HAVING clause must evaluate to a boolean");
+        errors.add("not yet implemented");
+
+        errors.add("Value expression and result of subquery must be of the same type for quantified comparison");
+        errors.add("All IN list values must be the same type");
+        errors.add("All CASE results must be the same type");
+        errors.add("Mismatched types");
+        errors.add("CASE operand type does not match WHEN clause operand type");
+        errors.add("Subquery result type must be orderable");
+        errors.add("Escape character must be followed by '%', '_' or the escape character itself");
+        errors.add("Types are not comparable with NULLIF");
+        errors.add("not of the same type");
+
+        if (PrestoBugs.bug23613) {
+            errors.add("at index 1");
+        }
+
+        return errors;
     }
 
-    private static void addRegexErrors(ExpectedErrors errors) {
+    public static void addExpressionErrors(ExpectedErrors errors) {
+        errors.addAll(getExpressionErrors());
+    }
+
+    private static List<String> getRegexErrors() {
+        ArrayList<String> errors = new ArrayList<>();
+
         errors.add("missing ]");
         errors.add("missing )");
         errors.add("invalid escape sequence");
@@ -69,9 +104,13 @@ public final class PrestoErrors {
         errors.add("invalid perl operator");
         errors.add("invalid character class range");
         errors.add("width is not integer");
+
+        return errors;
     }
 
-    private static void addFunctionErrors(ExpectedErrors errors) {
+    private static List<String> getFunctionErrors() {
+        ArrayList<String> errors = new ArrayList<>();
+
         errors.add("SUBSTRING cannot handle negative lengths");
         errors.add("is undefined outside [-1,1]"); // ACOS etc
         errors.add("invalid type specifier"); // PRINTF
@@ -90,12 +129,21 @@ public final class PrestoErrors {
         errors.add("Could not choose a best candidate function for the function call"); // monthname
         errors.add("expected a numeric precision field"); // ROUND
         errors.add("with non-constant precision is not supported"); // ROUND
+        errors.add("Unexpected parameters");
+        errors.add("not registered");
+        errors.add("Expected: least(E) E:orderable");
+        errors.add("Expected: greatest(E) E:orderable");
+        errors.add("Expected: max_by(V, K) K:orderable, V, max_by(V, K, bigint) V, K:orderable");
+        errors.add("Expected: min_by(V, K) K:orderable, V, min_by(V, K, bigint) V, K:orderable");
+        return errors;
     }
 
     // TODO: cover presto error
-    public static void addInsertErrors(ExpectedErrors errors) {
-        addRegexErrors(errors);
-        addFunctionErrors(errors);
+    public static List<String> getInsertErrors() {
+        ArrayList<String> errors = new ArrayList<>();
+
+        errors.addAll(getRegexErrors());
+        errors.addAll(getExpressionErrors());
 
         errors.add("NOT NULL constraint failed");
         errors.add("PRIMARY KEY or UNIQUE constraint violated");
@@ -118,10 +166,23 @@ public final class PrestoErrors {
         errors.add("Values rows have mismatched types");
         errors.add("Invalid numeric literal");
 
+        return errors;
+    }
+
+    public static void addInsertErrors(ExpectedErrors errors) {
+        errors.addAll(getInsertErrors());
+    }
+
+    public static List<String> getGroupByErrors() {
+        ArrayList<String> errors = new ArrayList<>();
+
+        errors.add("must be an aggregate expression or appear in GROUP BY clause");
+
+        return errors;
     }
 
     public static void addGroupByErrors(ExpectedErrors errors) {
-        errors.add("must be an aggregate expression or appear in GROUP BY clause");
+        errors.addAll(getGroupByErrors());
     }
 
 }

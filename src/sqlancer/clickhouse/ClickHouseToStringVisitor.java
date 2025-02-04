@@ -74,10 +74,10 @@ public class ClickHouseToStringVisitor extends ToStringVisitor<ClickHouseExpress
         }
 
         visit(select.getFetchColumns());
-        ClickHouseExpression fromClause = select.getFromClause();
-        if (fromClause != null) {
+        List<ClickHouseExpression> fromList = select.getFromList();
+        if (fromList != null) {
             sb.append(" FROM ");
-            visit(fromClause);
+            visit(fromList);
         }
         List<ClickHouseExpression.ClickHouseJoin> joins = select.getJoinClauses();
         if (!joins.isEmpty()) {
@@ -97,9 +97,9 @@ public class ClickHouseToStringVisitor extends ToStringVisitor<ClickHouseExpress
             sb.append(" HAVING ");
             visit(select.getHavingClause());
         }
-        if (!select.getOrderByClause().isEmpty()) {
+        if (!select.getOrderByClauses().isEmpty()) {
             sb.append(" ORDER BY ");
-            visit(select.getOrderByClause());
+            visit(select.getOrderByClauses());
         }
         if (inner) {
             sb.append(")");

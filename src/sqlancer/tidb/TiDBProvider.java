@@ -23,7 +23,6 @@ import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
 import sqlancer.common.query.SQLancerResultSet;
-import sqlancer.tidb.TiDBOptions.TiDBOracleFactory;
 import sqlancer.tidb.TiDBProvider.TiDBGlobalState;
 import sqlancer.tidb.TiDBSchema.TiDBTable;
 import sqlancer.tidb.gen.TiDBAlterTableGenerator;
@@ -152,6 +151,21 @@ public class TiDBProvider extends SQLProviderAdapter<TiDBGlobalState, TiDBOption
                 if (!table.isView()) {
                     globalState.executeStatement(new SQLQueryAdapter("ANALYZE TABLE " + table.getName() + ";", errors));
                 }
+            }
+        }
+
+        // TiFlash replication settings
+        if (globalState.getDbmsSpecificOptions().tiflash) {
+            ExpectedErrors errors = new ExpectedErrors();
+            TiDBErrors.addExpressionErrors(errors);
+            for (TiDBTable table : globalState.getSchema().getDatabaseTables()) {
+                if (!table.isView()) {
+                    globalState.executeStatement(
+                            new SQLQueryAdapter("ALTER TABLE " + table.getName() + " SET TIFLASH REPLICA 1;", errors));
+                }
+            }
+            if (Randomly.getBoolean()) {
+                globalState.executeStatement(new SQLQueryAdapter("set @@tidb_enforce_mpp=1;"));
             }
         }
     }

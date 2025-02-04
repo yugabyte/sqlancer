@@ -7,7 +7,7 @@ import sqlancer.Randomly;
 import sqlancer.common.gen.TypedExpressionGenerator;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
-import sqlancer.databend.DatabendExprToNode;
+import sqlancer.databend.DatabendErrors;
 import sqlancer.databend.DatabendProvider.DatabendGlobalState;
 import sqlancer.databend.DatabendSchema.DatabendColumn;
 import sqlancer.databend.DatabendSchema.DatabendCompositeDataType;
@@ -19,6 +19,7 @@ public class DatabendTableGenerator {
 
     public SQLQueryAdapter getQuery(DatabendGlobalState globalState) {
         ExpectedErrors errors = new ExpectedErrors();
+        DatabendErrors.addExpressionErrors(errors);
         StringBuilder sb = new StringBuilder();
         String tableName = globalState.getSchema().getFreeTableName();
         sb.append("CREATE TABLE ");
@@ -45,8 +46,7 @@ public class DatabendTableGenerator {
             if (Randomly.getBoolean() && globalState.getDbmsSpecificOptions().testDefaultValues) {
                 sb.append(" DEFAULT(");
                 sb.append(DatabendToStringVisitor.asString(// 常量类型于字段类型等同
-                        DatabendExprToNode
-                                .cast(gen.generateConstant(columns.get(i).getType().getPrimitiveDataType()))));
+                        gen.generateConstant(columns.get(i).getType().getPrimitiveDataType())));
                 sb.append(")");
             }
         }
