@@ -5,16 +5,18 @@ import sqlancer.*;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
-import sqlancer.common.query.SQLancerResultSet;
+// import sqlancer.common.query.SQLancerResultSet;
+import sqlancer.common.query.ExpectedErrors;
 import sqlancer.yugabyte.ysql.gen.*;
+// import sqlancer.yugabyte.ysql.gen.YSQLMergeGenerator; // Commented out - MERGE not supported
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
+import java.util.Arrays;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
 
 import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
 
@@ -55,7 +57,13 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                 nrPerformed = r.getInteger(0, 5);
                 break;
             case COMMIT:
-                nrPerformed = r.getInteger(0, 0);
+                nrPerformed = r.getInteger(0, 3);
+                break;
+            case SET_TRANSACTION:
+                nrPerformed = r.getInteger(0, 2);
+                break;
+            case PARALLEL_QUERY_TEST:
+                nrPerformed = r.getInteger(0, 1);
                 break;
             case ALTER_TABLE:
                 nrPerformed = r.getInteger(0, 5);
@@ -79,6 +87,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             case TRUNCATE:
                 nrPerformed = r.getInteger(0, 15);
                 break;
+            // case MERGE:
+            //     nrPerformed = r.getInteger(0, 10);
+            //     break;
             case CREATE_VIEW:
                 nrPerformed = r.getInteger(0, 5);
                 break;
@@ -228,6 +239,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     }
 
     protected void readFunctions(YSQLGlobalState globalState) throws SQLException {
+        // Commented out to avoid set-returning functions causing errors
+        /*
         SQLQueryAdapter query = new SQLQueryAdapter("SELECT proname, provolatile FROM pg_proc;");
         SQLancerResultSet rs = query.executeAndGet(globalState);
         while (rs.next()) {
@@ -235,6 +248,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             Character functionType = rs.getString(2).charAt(0);
             globalState.addFunctionAndType(functionName, functionType);
         }
+        */
     }
 
     protected void createTables(YSQLGlobalState globalState, int numTables) throws Exception {
@@ -259,7 +273,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     }
 
     protected void prepareTables(YSQLGlobalState globalState) throws Exception {
-        StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, Action.values(),
+        // Filter out unsupported actions like MERGE
+        Action[] supportedActions = Arrays.stream(Action.values())
+                .filter(action -> !action.name().equals("MERGE"))
+                .toArray(Action[]::new);
+        
+        StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, supportedActions,
                 YSQLProvider::mapActions, (q) -> {
             if (globalState.getSchema().getDatabaseTables().isEmpty()) {
                 throw new IgnoreMeException();
@@ -345,11 +364,22 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         SET(YSQLSetGenerator::create), // TODO insert yugabyte sets
         SET_CONSTRAINTS((g) -> {
             String sb = "SET CONSTRAINTS ALL " + Randomly.fromOptions("DEFERRED", "IMMEDIATE");
-            return new SQLQueryAdapter(sb);
+            return new SQLQueryAdapter(sb, ExpectedErrors.from(
+                "SET CONSTRAINTS is not supported yet",
+                "result of range union would not be contiguous",
+                "current transaction is aborted",
+                "there is no unique or exclusion constraint"
+            ));
         }), //
-        RESET_ROLE((g) -> new SQLQueryAdapter("RESET ROLE")), //
+        SET_TRANSACTION(YSQLTransactionGenerator::setTransactionMode), //
+        RESET_ROLE((g) -> new SQLQueryAdapter("RESET ROLE", ExpectedErrors.from(
+            "This statement not supported yet",
+            "current transaction is aborted"
+        ))), //
         COMMENT_ON(YSQLCommentGenerator::generate), //
-        RESET((g) -> new SQLQueryAdapter("RESET ALL") /*
+        RESET((g) -> new SQLQueryAdapter("RESET ALL", ExpectedErrors.from(
+                "current transaction is aborted, commands ignored until end of transaction block",
+                "RESET ALL cannot run inside a transaction block")) /*
          * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
          * configuration parameter
          */), //
@@ -358,7 +388,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 //        UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create),
-        REFRESH_VIEW(YSQLMaterializedViewRefresh::create);
+        REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
+        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest);
+        // MERGE(YSQLMergeGenerator::create); // Disabled - YugabyteDB doesn't support MERGE yet
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

@@ -56,6 +56,7 @@ public class YSQLTableGenerator {
         errors.add("has no default operator class for access method");
         errors.add("does not exist for access method");
         errors.add("does not accept data type");
+        errors.add("operator class");
         errors.add("but default expression is of type text");
         errors.add("has pseudo-type unknown");
         errors.add("Cannot split table that does not have primary key");
@@ -103,7 +104,8 @@ public class YSQLTableGenerator {
             errors.add("constraints on permanent tables may reference only permanent tables");
             errors.add("cannot be implemented");
             errors.add("there is no unique constraint matching given keys for referenced table");
-            errors.add("cannot reference partitioned table");
+            // PostgreSQL 15+ and YugabyteDB now support foreign keys on partitioned tables
+            // errors.add("cannot reference partitioned table");
             errors.add("unsupported ON COMMIT and foreign key combination");
             errors.add("ERROR: invalid ON DELETE action for foreign key constraint containing generated column");
             errors.add("exclusion constraints are not supported on partitioned tables");
@@ -154,6 +156,7 @@ public class YSQLTableGenerator {
         errors.add("does not accept data type");
         int n = partitionOption.contentEquals("LIST") ? 1 : Randomly.smallNumber() + 1;
         YSQLErrors.addCommonExpressionErrors(errors);
+        YSQLErrors.addCommonRangeExpressionErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         for (int i = 0; i < n; i++) {
             if (i != 0) {
@@ -212,7 +215,15 @@ public class YSQLTableGenerator {
             case DEFAULT:
                 sb.append("DEFAULT");
                 sb.append(" (");
-                sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, type)));
+                // For range types, generate constants to avoid type mismatches
+                if (type == YSQLDataType.RANGE || type == YSQLDataType.INT4RANGE || 
+                    type == YSQLDataType.INT8RANGE || type == YSQLDataType.NUMRANGE ||
+                    type == YSQLDataType.TSRANGE || type == YSQLDataType.TSTZRANGE || 
+                    type == YSQLDataType.DATERANGE) {
+                    sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), type)));
+                } else {
+                    sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, type)));
+                }
                 sb.append(")");
                 errors.add("out of range");
                 errors.add("is a generated column");

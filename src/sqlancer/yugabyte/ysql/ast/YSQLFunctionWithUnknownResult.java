@@ -58,7 +58,15 @@ public enum YSQLFunctionWithUnknownResult {
     // segfault
     BIT_LENGTH("bit_length", YSQLDataType.INT, YSQLDataType.BYTEA),
     INITCAP("initcap", YSQLDataType.TEXT, YSQLDataType.TEXT),
-    LEFT("left", YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.TEXT),
+    LEFT("left", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT) {
+        @Override  
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            YSQLExpression[] args = new YSQLExpression[2];
+            args[0] = gen.generateExpression(depth + 1, YSQLDataType.TEXT);
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 1000));
+            return args;
+        }
+    },
     LOWER("lower", YSQLDataType.TEXT, YSQLDataType.TEXT), MD5("md5", YSQLDataType.TEXT, YSQLDataType.TEXT),
     UPPER("upper", YSQLDataType.TEXT, YSQLDataType.TEXT),
     // PG_CLIENT_ENCODING("pg_client_encoding", YSQLDataType.TEXT),
@@ -69,12 +77,29 @@ public enum YSQLFunctionWithUnknownResult {
     // REPEAT("repeat", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT),
     REPLACE("replace", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
     REVERSE("reverse", YSQLDataType.TEXT, YSQLDataType.TEXT),
-    RIGHT("right", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT),
-    RPAD("rpad", YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.TEXT),
+    RIGHT("right", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            YSQLExpression[] args = new YSQLExpression[2];
+            args[0] = gen.generateExpression(depth + 1, YSQLDataType.TEXT);
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 1000));
+            return args;
+        }
+    },
+    RPAD("rpad", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.TEXT),
     RTRIM("rtrim", YSQLDataType.TEXT, YSQLDataType.TEXT),
     SPLIT_PART("split_part", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT),
     STRPOS("strpos", YSQLDataType.INT, YSQLDataType.TEXT, YSQLDataType.TEXT),
-    SUBSTR("substr", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.INT),
+    SUBSTR("substr", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.INT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            YSQLExpression[] args = new YSQLExpression[3];
+            args[0] = gen.generateExpression(depth + 1, YSQLDataType.TEXT);
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(1, 100));
+            args[2] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 100));
+            return args;
+        }
+    },
     TO_ASCII("to_ascii", YSQLDataType.TEXT, YSQLDataType.TEXT), TO_HEX("to_hex", YSQLDataType.INT, YSQLDataType.TEXT),
     TRANSLATE("translate", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
     // mathematical functions
@@ -115,8 +140,24 @@ public enum YSQLFunctionWithUnknownResult {
     ATANH("atanh", YSQLDataType.REAL), //
 
     // https://www.postgresql.org/docs/devel/functions-binarystring.html
-    GET_BIT("get_bit", YSQLDataType.INT, YSQLDataType.TEXT, YSQLDataType.INT),
-    GET_BYTE("get_byte", YSQLDataType.INT, YSQLDataType.TEXT, YSQLDataType.INT),
+    GET_BIT("get_bit", YSQLDataType.INT, YSQLDataType.BYTEA, YSQLDataType.INT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            YSQLExpression[] args = new YSQLExpression[2];
+            args[0] = YSQLConstant.createByteConstant("\\x414243");
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 23));
+            return args;
+        }
+    },
+    GET_BYTE("get_byte", YSQLDataType.INT, YSQLDataType.BYTEA, YSQLDataType.INT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            YSQLExpression[] args = new YSQLExpression[2];
+            args[0] = YSQLConstant.createByteConstant("\\x414243");
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 2));
+            return args;
+        }
+    },
 
     // range functions
     // https://www.postgresql.org/docs/devel/functions-range.html#RANGE-FUNCTIONS-TABLE
@@ -130,9 +171,14 @@ public enum YSQLFunctionWithUnknownResult {
     RANGE_MERGE("range_merge", YSQLDataType.RANGE, YSQLDataType.RANGE, YSQLDataType.RANGE), //
 
     // https://www.postgresql.org/docs/devel/functions-admin.html#FUNCTIONS-ADMIN-DBSIZE
-    GET_COLUMN_SIZE("get_column_size", YSQLDataType.INT, YSQLDataType.TEXT);
+    GET_COLUMN_SIZE("get_column_size", YSQLDataType.INT, YSQLDataType.TEXT),
     // PG_DATABASE_SIZE("pg_database_size", YSQLDataType.INT, YSQLDataType.INT);
     // PG_SIZE_BYTES("pg_size_bytes", YSQLDataType.INT, YSQLDataType.TEXT);
+    
+    // SQL/JSON path functions (PostgreSQL 15+)
+    JSON_EXISTS("json_exists", YSQLDataType.BOOLEAN, YSQLDataType.JSONB, YSQLDataType.TEXT),
+    JSON_VALUE("json_value", YSQLDataType.TEXT, YSQLDataType.JSONB, YSQLDataType.TEXT),
+    JSON_QUERY("json_query", YSQLDataType.JSONB, YSQLDataType.JSONB, YSQLDataType.TEXT);
 
     private final String functionName;
     private final YSQLDataType returnType;
