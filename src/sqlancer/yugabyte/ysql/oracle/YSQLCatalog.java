@@ -77,8 +77,8 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             } else {
                 randomAction = getRandomAction(diskActions);
             }
-
-            state.executeStatement(randomAction.getQuery(state));
+            SQLQueryAdapter q = new SQLQueryAdapter(randomAction.getQuery(state).getQueryString(), errors);
+            q.execute(state);
         }
         state.getManager().incrementSelectQueryCount();
     }
