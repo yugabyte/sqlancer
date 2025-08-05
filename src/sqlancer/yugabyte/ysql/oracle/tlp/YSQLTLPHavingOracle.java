@@ -16,6 +16,9 @@ public class YSQLTLPHavingOracle extends YSQLTLPBase {
 
     public YSQLTLPHavingOracle(YSQLGlobalState state) {
         super(state);
+        YSQLErrors.addCommonExpressionErrors(errors);
+        YSQLErrors.addCommonFetchErrors(errors);
+        YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addGroupingErrors(errors);
     }
 

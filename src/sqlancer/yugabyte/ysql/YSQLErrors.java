@@ -12,6 +12,7 @@ public final class YSQLErrors {
 
         errors.add("must be called before any query");
         errors.add("cannot be");
+        errors.add("cast");
 
         errors.add("FULL JOIN is only supported with merge-joinable or hash-joinable join conditions");
         errors.add("missing FROM-clause entry for table");
@@ -95,7 +96,6 @@ public final class YSQLErrors {
         errors.add("Read Committed isolation level not supported");
         errors.add("yb_enable_read_committed_isolation must be enabled");
         errors.add("could not serialize access due to read/write dependencies among transactions");
-        errors.add("could not serialize access due to concurrent update");
         errors.add("Transaction aborted");
         errors.add("Transaction conflicted");
         errors.add("current transaction is aborted, commands ignored until end of transaction block");

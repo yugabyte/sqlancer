@@ -115,7 +115,6 @@ public class YSQLNoRECOracle extends NoRECBase<YSQLGlobalState> implements TestO
         if (options.logEachSelect()) {
             logger.writeCurrent(unoptimizedQueryString);
         }
-        errors.add("canceling statement due to statement timeout");
         SQLQueryAdapter q = new SQLQueryAdapter(unoptimizedQueryString, errors);
         SQLancerResultSet rs;
         try {
