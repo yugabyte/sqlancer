@@ -6,6 +6,7 @@ import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.schema.AbstractTableColumn;
+import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 
@@ -32,7 +33,11 @@ public final class YSQLAnalyzeGenerator {
         }
 
         ExpectedErrors errors = ExpectedErrors.from("deadlock");
-        errors.add("current transaction is aborted");
+        errors.add("is an identity column");
+        errors.add("is in a primary key");
+        YSQLErrors.addGroupingErrors(errors);
+        YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addCommonExpressionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 
