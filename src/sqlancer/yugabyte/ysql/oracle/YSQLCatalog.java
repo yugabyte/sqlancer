@@ -11,7 +11,6 @@ import sqlancer.common.DBMSCommon;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
-import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLProvider;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
