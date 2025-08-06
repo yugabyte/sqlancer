@@ -67,6 +67,7 @@ public final class YSQLTransactionGenerator {
         errors.add("cannot use serializable mode in a hot standby");
         errors.add("SET TRANSACTION must be called before any query");
         errors.add("cannot be called");
+        errors.add("must be called");
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors, true);
     }

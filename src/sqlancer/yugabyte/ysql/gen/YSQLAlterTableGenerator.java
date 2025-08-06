@@ -35,6 +35,8 @@ public class YSQLAlterTableGenerator {
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         errors.add("duplicate key value violates unique constraint");
+        errors.add("already has a default value");
+        errors.add("is not a parent of relation");
         errors.add("cannot drop key column");
         errors.add("cannot be cast");
         errors.add("is in a primary key");
@@ -264,7 +266,7 @@ public class YSQLAlterTableGenerator {
                     throw new IgnoreMeException();
                 }
                 break;
-                
+
             case ALTER_COLUMN_DROP_IDENTITY:
                 sb.append("ALTER ");
                 if (Randomly.getBoolean()) {
@@ -274,8 +276,6 @@ public class YSQLAlterTableGenerator {
                 if (Randomly.getBoolean()) {
                     sb.append(" IF EXISTS");
                 }
-                errors.add("column is not an identity column");
-                errors.add("is not an identity column");
                 errors.add("is not an identity column");
                 break;
                 

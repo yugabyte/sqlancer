@@ -38,9 +38,6 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
         this.con = state.getConnection();
         this.logger = state.getLogger();
         this.options = state.getOptions();
-        YSQLErrors.addCommonExpressionErrors(errors);
-        YSQLErrors.addCommonFetchErrors(errors);
-        YSQLErrors.addTransactionErrors(errors);
     }
 
     private YSQLProvider.Action getRandomAction(List<YSQLProvider.Action> actions) {
@@ -77,8 +74,7 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             } else {
                 randomAction = getRandomAction(diskActions);
             }
-            SQLQueryAdapter q = new SQLQueryAdapter(randomAction.getQuery(state).getQueryString(), errors);
-            q.execute(state);
+            randomAction.getQuery(state).execute(state);
         }
         state.getManager().incrementSelectQueryCount();
     }

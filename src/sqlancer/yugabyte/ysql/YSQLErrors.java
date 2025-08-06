@@ -85,6 +85,7 @@ public final class YSQLErrors {
         errors.add("Restart read required");
         errors.add("could not serialize access due to concurrent update");
         errors.add("Timed out waiting");
+        errors.add("in a read-only transaction");
         errors.add("An I/O error occurred while sending to the backend");
         errors.add("RPC");
         errors.add("Conflicts with committed transaction");

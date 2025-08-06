@@ -25,6 +25,7 @@ public final class YSQLMaterializedViewRefresh {
             YSQLErrors.addCommonExpressionErrors(errors);
             YSQLErrors.addTransactionErrors(errors);
             errors.add("Create a unique index with no WHERE clause on one or more columns of the materialized view");
+            errors.add("cannot refresh materialized view");
             return new SQLQueryAdapter(sb.toString(), errors, true);
         } catch (Exception e) {
             throw new IgnoreMeException();

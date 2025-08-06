@@ -27,18 +27,28 @@ public final class YSQLInsertGenerator {
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         errors.add("cannot insert into column");
+        errors.add("violates not-null constraint");
         errors.add("does not support Infinity yet");
         errors.add("cannot insert a non-DEFAULT value into column");
         errors.add("multiple assignments to same column");
         errors.add("violates foreign key constraint");
         errors.add("value too long for type character varying");
         errors.add("conflicting key value violates exclusion constraint");
-        errors.add("violates not-null constraint");
         errors.add("current transaction is aborted");
         errors.add("bit string too long");
         errors.add("new row violates check option for view");
         errors.add("reached maximum value of sequence");
         errors.add("but expression is of type");
+        errors.add("there is no unique or exclusion constraint matching the ON CONFLICT specification");
+        errors.add("duplicate key value violates unique constraint");
+        errors.add("identity column defined as GENERATED ALWAYS");
+        errors.add("out of range");
+        errors.add("violates check constraint");
+        errors.add("no partition of relation");
+        errors.add("invalid input syntax");
+        errors.add("division by zero");
+        errors.add("violates foreign key constraint");
+        errors.add("data type unknown");
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO ");
         sb.append(table.getName());
@@ -92,15 +102,6 @@ public final class YSQLInsertGenerator {
             }
             sb.append(" DO NOTHING");
         }
-        errors.add("duplicate key value violates unique constraint");
-        errors.add("identity column defined as GENERATED ALWAYS");
-        errors.add("out of range");
-        errors.add("violates check constraint");
-        errors.add("no partition of relation");
-        errors.add("invalid input syntax");
-        errors.add("division by zero");
-        errors.add("violates foreign key constraint");
-        errors.add("data type unknown");
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 
