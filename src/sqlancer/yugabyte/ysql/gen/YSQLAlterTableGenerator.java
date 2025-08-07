@@ -34,6 +34,7 @@ public class YSQLAlterTableGenerator {
         YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        errors.add("not yet supported");
         errors.add("duplicate key value violates unique constraint");
         errors.add("already has a default value");
         errors.add("is not a parent of relation");
@@ -663,7 +664,6 @@ public class YSQLAlterTableGenerator {
         }
         
         // Add general ALTER TABLE errors
-        errors.add("this ALTER TABLE command is not yet supported");
         errors.add("child table");
 
         return new SQLQueryAdapter(sb.toString(), errors, true);
