@@ -34,6 +34,11 @@ public class YSQLAlterTableGenerator {
         YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        errors.add("is an identity column");
+        errors.add("contains null values");
+        errors.add("would be inherited from more than once");
+        errors.add("is not a foreign key or check constraint");
+        errors.add("because it is part of the partition key of relation");
         errors.add("not yet supported");
         errors.add("duplicate key value violates unique constraint");
         errors.add("already has a default value");
@@ -216,7 +221,6 @@ public class YSQLAlterTableGenerator {
                     sb.append("COLUMN ");
                 }
                 sb.append(randomTable.getRandomColumn().getName()).append(" SET NOT NULL");
-                errors.add("contains null values");
                 errors.add("column is already NOT NULL");
                 break;
                 

@@ -109,6 +109,8 @@ public final class YSQLErrors {
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
+        errors.add("could not convert type bytea to");
+        errors.add("Unterminated string literal started at position");
         errors.add("non-integer constant in");
         errors.add("must appear in the GROUP BY clause or be used in an aggregate function");
         // JSONB specific errors

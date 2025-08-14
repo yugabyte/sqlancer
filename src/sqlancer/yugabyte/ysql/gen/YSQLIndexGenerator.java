@@ -108,6 +108,7 @@ public final class YSQLIndexGenerator {
         }
         errors.add("already contains data"); // CONCURRENT INDEX failed
         errors.add("You might need to add explicit type casts");
+        errors.add("only supported for indexes using Yugabyte storage");
         errors.add("INDEX on column of type");
         errors.add("collations are not supported"); // TODO check
         errors.add("because it has pending trigger events");
