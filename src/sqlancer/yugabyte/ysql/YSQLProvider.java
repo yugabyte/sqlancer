@@ -326,7 +326,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                 }
 
                 // create non colocated database with low priority to avoid cluster resource issues
-                if (Randomly.getPercentage() > 0.05) {
+                if (Randomly.getPercentage() > 0.05 && state.getDbmsSpecificOptions().pgCompatibility) {
                     sb.append("COLOCATION = true ");
                 }
 
@@ -347,6 +347,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         ALTER_TABLE(g -> YSQLAlterTableGenerator.create(g.getSchema().getRandomTable(t -> !t.isView()), g)), //
         COMMIT(g -> {
             SQLQueryAdapter query;
+            ExpectedErrors errors = new ExpectedErrors();
+            YSQLErrors.addTransactionErrors(errors);
             if (Randomly.getBoolean()) {
                 query = new SQLQueryAdapter("COMMIT", true);
             } else if (Randomly.getBoolean()) {
