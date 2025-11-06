@@ -10,6 +10,8 @@ import sqlancer.common.schema.AbstractTableColumn;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
+
+import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
@@ -92,15 +94,89 @@ public final class YSQLInsertGenerator {
                 insertRow(globalState, sb, columns, n == 1);
             }
         }
+        // Enhanced ON CONFLICT support for YugabyteDB 2025.1
         if (Randomly.getBooleanWithRatherLowProbability()) {
             sb.append(" ON CONFLICT ");
+            
+            // Conflict target specification
             if (Randomly.getBoolean()) {
                 sb.append("(");
-                sb.append(table.getRandomColumn().getName());
-                sb.append(")");
+                // Support multiple columns for composite constraints
+                List<YSQLColumn> conflictColumns = table.getRandomNonEmptyColumnSubset(
+                        Randomly.fromOptions(1, 2, 3));
+                sb.append(conflictColumns.stream()
+                        .map(AbstractTableColumn::getName)
+                        .collect(Collectors.joining(", ")));
+                
+                // Optional WHERE clause for partial unique index (2025.1 enhancement)
+                if (Randomly.getBooleanWithRatherLowProbability()) {
+                    sb.append(") WHERE ");
+                    YSQLExpression whereExpr = YSQLExpressionGenerator.generateExpression(globalState,
+                            table.getColumns());
+                    sb.append(YSQLVisitor.asString(whereExpr));
+                } else {
+                    sb.append(")");
+                }
                 errors.add("there is no unique or exclusion constraint matching the ON CONFLICT specification");
             }
-            sb.append(" DO NOTHING");
+            
+            // Conflict action: DO NOTHING or DO UPDATE
+            if (Randomly.getBoolean()) {
+                sb.append(" DO NOTHING");
+            } else {
+                // DO UPDATE with enhanced support
+                sb.append(" DO UPDATE SET ");
+                List<YSQLColumn> updateColumns = table.getRandomNonEmptyColumnSubset();
+                for (int i = 0; i < updateColumns.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    YSQLColumn col = updateColumns.get(i);
+                    sb.append(col.getName()).append(" = ");
+                    
+                    if (Randomly.getBoolean()) {
+                        // Use EXCLUDED values
+                        sb.append("EXCLUDED.").append(col.getName());
+                    } else if (Randomly.getBoolean()) {
+                        // Use expression
+                        YSQLExpression expr = YSQLExpressionGenerator.generateConstant(
+                                globalState.getRandomly(), col.getType());
+                        sb.append(YSQLVisitor.asString(expr));
+                    } else {
+                        // Use current value with modification
+                        sb.append(table.getName()).append(".").append(col.getName());
+                        if (col.getType() == YSQLDataType.TEXT) {
+                            sb.append(" || '_updated'");
+                        } else if (col.getType() == YSQLDataType.INT) {
+                            sb.append(" + 1");
+                        }
+                    }
+                }
+                
+                // Optional WHERE clause for conditional update
+                if (Randomly.getBooleanWithRatherLowProbability()) {
+                    sb.append(" WHERE ");
+                    YSQLExpression whereExpr = new YSQLExpressionGenerator(globalState)
+                            .setColumns(table.getColumns())
+                            .generateExpression(YSQLDataType.BOOLEAN);
+                    sb.append(YSQLVisitor.asString(whereExpr));
+                }
+                
+                errors.add("ON CONFLICT DO UPDATE command cannot affect row a second time");
+                errors.add("column reference is ambiguous");
+            }
+        }
+        
+        // RETURNING clause support (enhanced in 2025.1 for ON CONFLICT)
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            sb.append(" RETURNING ");
+            if (Randomly.getBoolean()) {
+                sb.append("*");
+            } else {
+                List<YSQLColumn> returningColumns = table.getRandomNonEmptyColumnSubset();
+                sb.append(returningColumns.stream()
+                        .map(AbstractTableColumn::getName)
+                        .collect(Collectors.joining(", ")));
+            }
+            errors.add("corrupt data for INSERT ON CONFLICT with RETURNING");
         }
         return new SQLQueryAdapter(sb.toString(), errors);
     }

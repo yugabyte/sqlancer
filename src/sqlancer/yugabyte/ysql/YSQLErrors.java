@@ -109,6 +109,7 @@ public final class YSQLErrors {
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
+        errors.add("invalid line specification");
         errors.add("could not convert type bytea to");
         errors.add("Unterminated string literal started at position");
         errors.add("non-integer constant in");

@@ -34,6 +34,7 @@ public class YSQLAlterTableGenerator {
         YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        errors.add("cannot alter inherited column");
         errors.add("is an identity column");
         errors.add("contains null values");
         errors.add("would be inherited from more than once");

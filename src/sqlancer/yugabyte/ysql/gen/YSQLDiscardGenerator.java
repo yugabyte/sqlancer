@@ -3,6 +3,7 @@ package sqlancer.yugabyte.ysql.gen;
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable.TableType;
 
@@ -31,6 +32,7 @@ public final class YSQLDiscardGenerator {
                 "DISCARD ALL cannot run inside a transaction block",
                 "DISCARD TEMP cannot run inside a transaction block",
                 "DISCARD TEMPORARY cannot run inside a transaction block");
+        YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors) {
 
             @Override

@@ -394,8 +394,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create),
         REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
-        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest);
-        // MERGE(YSQLMergeGenerator::create); // Disabled - YugabyteDB doesn't support MERGE yet
+        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
+        // YugabyteDB 2025.1 new features
+        // Simplified vector testing (full vector support requires vector column type)
+        VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
+        VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
+        VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

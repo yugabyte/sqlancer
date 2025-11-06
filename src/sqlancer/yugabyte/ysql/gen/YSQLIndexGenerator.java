@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -85,7 +86,7 @@ public final class YSQLIndexGenerator {
         }
 
         sb.append(")");
-        
+
         // PostgreSQL 15 feature: NULLS NOT DISTINCT for unique indexes
         boolean hasNullsNotDistinct = isUnique && Randomly.getBoolean();
         if (hasNullsNotDistinct) {

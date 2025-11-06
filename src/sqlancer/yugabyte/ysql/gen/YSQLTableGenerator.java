@@ -74,7 +74,12 @@ public class YSQLTableGenerator {
     private SQLQueryAdapter generate() {
         columnCanHavePrimaryKey = true;
         sb.append("CREATE");
-        if (Randomly.getBooleanWithSmallProbability()) {
+
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            sb.append(" UNLOGGED");
+            errors.add("UNLOGGED keyword is ignored");
+            errors.add("WARNING: UNLOGGED keyword is ignored");
+        } else if (Randomly.getBooleanWithSmallProbability()) {
             sb.append(" ");
             isTemporaryTable = true;
             sb.append(Randomly.fromOptions("TEMPORARY", "TEMP"));
