@@ -226,6 +226,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         while (System.currentTimeMillis() < endTime) {
             try {
                 con = DriverManager.getConnection(entryURL, user, password);
+                con.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
                 break;
             } catch (SQLException throwables) {
                 lastException = new IllegalStateException(throwables);
