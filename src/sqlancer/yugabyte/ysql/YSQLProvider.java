@@ -103,11 +103,11 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                 nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
                 break;
                 // YugabyteDB 2025.1 new features
-            case VECTOR_SYNTAX_TEST:
-            case VECTOR_INDEX_SYNTAX:
-            case VECTOR_SETTINGS:
-                nrPerformed = r.getInteger(0, 2);  // Less frequent as these will mostly error
-                break;
+//            case VECTOR_SYNTAX_TEST:
+//            case VECTOR_INDEX_SYNTAX:
+//            case VECTOR_SETTINGS:
+//                nrPerformed = r.getInteger(0, 2);  // Less frequent as these will mostly error
+//                break;
             default:
                 throw new AssertionError(a);
         }
@@ -401,12 +401,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create),
         REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
-        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
+        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest);
         // YugabyteDB 2025.1 new features
         // Simplified vector testing (full vector support requires vector column type)
-        VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
-        VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
-        VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
+//        VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
+//        VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
+//        VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 
