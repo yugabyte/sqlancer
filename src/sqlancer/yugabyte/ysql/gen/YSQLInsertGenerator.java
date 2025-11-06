@@ -11,7 +11,6 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 
-import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
