@@ -102,6 +102,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             case INSERT:
                 nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
                 break;
+                // YugabyteDB 2025.1 new features
+            case VECTOR_SYNTAX_TEST:
+            case VECTOR_INDEX_SYNTAX:
+            case VECTOR_SETTINGS:
+                nrPerformed = r.getInteger(0, 2);  // Less frequent as these will mostly error
+                break;
             default:
                 throw new AssertionError(a);
         }
