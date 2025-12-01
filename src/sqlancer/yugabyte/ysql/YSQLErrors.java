@@ -104,7 +104,8 @@ public final class YSQLErrors {
         errors.add("Wait queue operation failed");
         errors.add("yb_enable_wait_queues must be enabled");
         errors.add("Wait-on-Conflict mode requires Read Committed isolation");
-        errors.add("Deadlock detected");
+        errors.add("Deadlock");
+        errors.add("deadlock");
         errors.add("Statement timeout while waiting for lock");
     }
 
