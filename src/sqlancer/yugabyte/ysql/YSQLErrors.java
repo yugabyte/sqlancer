@@ -95,7 +95,7 @@ public final class YSQLErrors {
         errors.add("no partition of relation");
         // YugabyteDB Read-Committed specific errors
         errors.add("Read Committed isolation level not supported");
-        errors.add("yb_enable_read_committed_isolation must be enabled");
+        errors.add("yb_enablree_read_committed_isolation must be enabled");
         errors.add("could not serialize access due to read/write dependencies among transactions");
         errors.add("Transaction aborted");
         errors.add("Transaction conflicted");

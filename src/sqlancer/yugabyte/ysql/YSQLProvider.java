@@ -24,6 +24,17 @@ import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
 public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOptions> {
 
     /**
+     * Global lock for database creation - YugabyteDB cannot create multiple databases simultaneously
+     * due to catalog version conflicts across the distributed system.
+     */
+    private static final Object DATABASE_CREATION_LOCK = new Object();
+
+    /**
+     * Safety delay (in ms) before and after database creation to allow catalog changes to propagate.
+     */
+    private static final long SAFETY_DELAY_MS = 2000;
+
+    /**
      * Generate only data types and expressions that are understood by PQS.
      */
     public static boolean generateOnlyKnown;
@@ -192,37 +203,61 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         return "ysql";
     }
 
-    // for some reason yugabyte unable to create few databases simultaneously
+    /**
+     * Synchronized database creation with safety delays.
+     * YugabyteDB cannot create multiple databases simultaneously due to catalog version conflicts
+     * across the distributed system. This method serializes all database creation operations
+     * with 2-second safety delays before and after to allow catalog changes to propagate.
+     */
     private void createDatabaseSync(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
-        int counter = 0;
-        while (true) {
-            try (Connection con = createConnectionSafely(entryURL, username, password)) {
-                globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
-                globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
-                createDatabaseCommand = getCreateDatabaseCommand(globalState);
-                globalState.getState().logStatement(createDatabaseCommand);
-                try (Statement s = con.createStatement()) {
-                    s.execute("DROP DATABASE IF EXISTS " + databaseName);
-                }
-                try (Statement s = con.createStatement()) {
-                    s.execute(createDatabaseCommand);
-                }
-                break;
-            } catch (Exception e) {
-                if ((e.getMessage().contains("Catalog Version Mismatch") || e.getMessage().contains("Restart read required")
-                        || e.getMessage().contains("could not serialize access due to concurrent update")
-                        || e.getMessage().contains("not onlined")
-                        || e.getMessage().contains("is being accessed by other users")
-                        || e.getMessage().contains("Timed out waiting")
-                        || e.getMessage().contains("Restarting a DDL transaction not supported"))
-                        && counter < 20) {
-                    counter++;
-                    exceptionLessSleep(500);
-                } else {
-                    throw e;
+        synchronized (DATABASE_CREATION_LOCK) {
+            // Safety delay before - allow any previous DDL to propagate across the cluster
+            exceptionLessSleep(SAFETY_DELAY_MS);
+
+            int counter = 0;
+            while (true) {
+                try (Connection con = createConnectionSafely(entryURL, username, password)) {
+                    globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
+                    globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
+                    createDatabaseCommand = getCreateDatabaseCommand(globalState);
+                    globalState.getState().logStatement(createDatabaseCommand);
+                    try (Statement s = con.createStatement()) {
+                        s.execute("DROP DATABASE IF EXISTS " + databaseName);
+                    }
+                    try (Statement s = con.createStatement()) {
+                        s.execute(createDatabaseCommand);
+                    }
+                    break;
+                } catch (Exception e) {
+                    if (isRetryableDatabaseCreationError(e) && counter < 20) {
+                        counter++;
+                        exceptionLessSleep(500);
+                    } else {
+                        throw e;
+                    }
                 }
             }
+
+            // Safety delay after - allow DDL to propagate before releasing lock
+            exceptionLessSleep(SAFETY_DELAY_MS);
         }
+    }
+
+    /**
+     * Check if the exception is a retryable error during database creation.
+     */
+    private boolean isRetryableDatabaseCreationError(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) {
+            return false;
+        }
+        return msg.contains("Catalog Version Mismatch")
+                || msg.contains("Restart read required")
+                || msg.contains("could not serialize access due to concurrent update")
+                || msg.contains("not onlined")
+                || msg.contains("is being accessed by other users")
+                || msg.contains("Timed out waiting")
+                || msg.contains("Restarting a DDL transaction not supported");
     }
 
     private Connection createConnectionSafely(String entryURL, String user, String password) {
