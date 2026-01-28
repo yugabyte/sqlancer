@@ -224,6 +224,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                     try (Statement s = con.createStatement()) {
                         s.execute("DROP DATABASE IF EXISTS " + databaseName);
                     }
+                    exceptionLessSleep(SAFETY_DELAY_MS);
                     try (Statement s = con.createStatement()) {
                         s.execute(createDatabaseCommand);
                     }
