@@ -1,10 +1,7 @@
 package sqlancer.yugabyte.ysql.gen;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import sqlancer.IgnoreMeException;
@@ -227,24 +224,6 @@ public final class YSQLCommon {
         if (Randomly.getBoolean()) {
             if (Randomly.getBoolean()) {
                 sb.append(" WITHOUT OIDS ");
-            } else {
-                sb.append(" WITH (");
-                ArrayList<StorageParameters> values = new ArrayList<>(Arrays.asList(StorageParameters.values()));
-                errors.add("unrecognized parameter");
-                errors.add("ALTER TABLE / ADD CONSTRAINT USING INDEX is not supported on partitioned tables");
-                errors.add("no collation was derived for partition key column");
-                errors.add("true on a non-colocated database");
-                List<StorageParameters> subset = Randomly.nonEmptySubset(values);
-                int i = 0;
-                for (StorageParameters parameter : subset) {
-                    if (i++ != 0) {
-                        sb.append(", ");
-                    }
-                    sb.append(parameter.parameter);
-                    sb.append("=");
-                    sb.append(parameter.op.apply(globalState.getRandomly()));
-                }
-                sb.append(")");
             }
         } else if (Randomly.getBoolean() && !isTemporaryTable) {
             if (Randomly.getBoolean()) {
@@ -411,18 +390,6 @@ public final class YSQLCommon {
 
     public enum TableConstraints {
         CHECK, UNIQUE, PRIMARY_KEY, FOREIGN_KEY
-    }
-
-    private enum StorageParameters {
-        COLOCATION("COLOCATION", (r) -> Randomly.getBoolean());
-
-        private final String parameter;
-        private final Function<Randomly, Object> op;
-
-        StorageParameters(String parameter, Function<Randomly, Object> op) {
-            this.parameter = parameter;
-            this.op = op;
-        }
     }
 
 }

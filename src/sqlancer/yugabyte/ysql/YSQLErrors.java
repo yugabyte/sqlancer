@@ -7,8 +7,17 @@ public final class YSQLErrors {
     private YSQLErrors() {
     }
 
-    public static void addCommonFetchErrors(ExpectedErrors errors) {
+    public static void addKnownIssues(ExpectedErrors errors) {
+        errors.add("Read time should NOT be specified for serializable isolation level");
         errors.add("Table with identifier");
+        errors.add("Restarting a DDL transaction not supported");
+        errors.add("An I/O error occurred while sending to the backend");
+        errors.add("RPC");
+        errors.add("lost connection to parallel worker");
+    }
+
+    public static void addCommonFetchErrors(ExpectedErrors errors) {
+        addKnownIssues(errors);
 
         errors.add("must be called before any query");
         errors.add("cannot be");
@@ -82,12 +91,12 @@ public final class YSQLErrors {
     }
 
     public static void addTransactionErrors(ExpectedErrors errors) {
+        addKnownIssues(errors);
+
         errors.add("Restart read required");
         errors.add("could not serialize access due to concurrent update");
         errors.add("Timed out waiting");
         errors.add("in a read-only transaction");
-        errors.add("An I/O error occurred while sending to the backend");
-        errors.add("RPC");
         errors.add("Conflicts with committed transaction");
         errors.add("cannot insert a non-DEFAULT value into column");
         errors.add("Operation failed. Try again");

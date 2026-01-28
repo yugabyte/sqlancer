@@ -256,6 +256,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                 || msg.contains("could not serialize access due to concurrent update")
                 || msg.contains("not onlined")
                 || msg.contains("is being accessed by other users")
+                || msg.contains("connection has been closed")
+                || msg.contains("does not exist")
                 || msg.contains("Timed out waiting")
                 || msg.contains("Restarting a DDL transaction not supported");
     }
