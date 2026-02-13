@@ -20,8 +20,9 @@ public final class YSQLErrors {
         addKnownIssues(errors);
 
         errors.add("must be called before any query");
-        errors.add("cannot be");
-        errors.add("cast");
+        errors.add("cannot be applied when");
+        errors.add("cannot be referenced from this part of the query");
+        errors.add("cannot be used as replica identity");
 
         errors.add("FULL JOIN is only supported with merge-joinable or hash-joinable join conditions");
         errors.add("missing FROM-clause entry for table");
@@ -104,7 +105,7 @@ public final class YSQLErrors {
         errors.add("no partition of relation");
         // YugabyteDB Read-Committed specific errors
         errors.add("Read Committed isolation level not supported");
-        errors.add("yb_enablree_read_committed_isolation must be enabled");
+        errors.add("yb_enable_read_committed_isolation must be enabled");
         errors.add("could not serialize access due to read/write dependencies among transactions");
         errors.add("Transaction aborted");
         errors.add("Transaction conflicted");
@@ -140,11 +141,24 @@ public final class YSQLErrors {
         errors.add("token");
         errors.add("JSON");
         errors.add("GROUP BY position");
-        errors.add("must not be");
-        errors.add("must be");
+        errors.add("must not return a set");
+        errors.add("must be less");
+        errors.add("must not be negative");
+        errors.add("must not be empty");
+        errors.add("must be type boolean");
+        errors.add("must be an aggregate expression");
+        errors.add("must be of type");
+        errors.add("must be an integer constant");
+        errors.add("must be greater");
+        errors.add("must be declared");
+        errors.add("must be simple column");
+        errors.add("must be marked IMMUTABLE");
+        errors.add("identity column type must be smallint, integer, or bigint");
         errors.add("cannot be changed");
-        errors.add("cannot be less");
-        errors.add("cannot be greater");
+        errors.add("cannot be less than MINVALUE");
+        errors.add("cannot be greater than MAXVALUE");
+        errors.add("cannot be implemented");
+        errors.add("cannot be marked NOT VALID");
 
         errors.add("invalid byte sequence for encoding");
         errors.add("cannot convert infinity to integer");
@@ -153,14 +167,6 @@ public final class YSQLErrors {
 
         errors.add("is not a table");
         errors.add("cannot change materialized view");
-        errors.add("syntax error at or near \"(\"");
-        errors.add("syntax error at or near \"WITH\"");
-        errors.add("syntax error at or near \"RENAME\"");
-        errors.add("syntax error at or near \",\"");
-        errors.add("syntax error at or near \"ATTACH\"");
-        errors.add("syntax error at or near \"SCHEMA\"");
-        errors.add("syntax error at or near \"USER\"");
-        errors.add("syntax error at or near \"ALL\"");
         errors.add("syntax error at or near");
         errors.add("encoding conversion from");
         errors.add("does not exist");
@@ -168,7 +174,6 @@ public final class YSQLErrors {
         errors.add("is not supported");
         errors.add("This statement not supported yet");
         errors.add("not supported yet");
-        errors.add("cannot be changed");
         errors.add("invalid reference to FROM-clause entry for table");
 
         errors.add("Invalid column number");
@@ -201,9 +206,6 @@ public final class YSQLErrors {
         errors.add("is of type boolean but expression is of type text");
         errors.add("but default expression is of type");
         errors.add("but expression is of type");
-        errors.add("but default expression is of type");
-        errors.add("is of type numrange but default expression is of type int4range");
-        errors.add("is of type int8range but default expression is of type int4range");
         errors.add("CASE types text and bytea cannot be matched");
         errors.add("a negative number raised to a non-integer power yields a complex result");
         errors.add("could not determine polymorphic type because input has type unknown");

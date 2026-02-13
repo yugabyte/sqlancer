@@ -42,6 +42,7 @@ public final class YSQLTruncateGenerator {
         // TODO remove Restart read required after proper tx ddls
         ExpectedErrors errors = ExpectedErrors
                 .from("cannot truncate a table referenced in a foreign key constraint", "is not a table");
+        errors.add("does not exist"); // https://github.com/yugabyte/yugabyte-db/issues/28276
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);
     }

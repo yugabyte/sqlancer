@@ -27,7 +27,7 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             YSQLProvider.Action.UPDATE, YSQLProvider.Action.DELETE);
     private final List<YSQLProvider.Action> catalogActions = Arrays.asList(YSQLProvider.Action.CREATE_VIEW,
             YSQLProvider.Action.REFRESH_VIEW, YSQLProvider.Action.CREATE_SEQUENCE, YSQLProvider.Action.ALTER_TABLE, YSQLProvider.Action.SET_CONSTRAINTS,
-            YSQLProvider.Action.DISCARD, YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON,
+            YSQLProvider.Action.DISCARD, YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON, YSQLProvider.Action.ALTER_DATABASE,
             YSQLProvider.Action.RESET_ROLE, YSQLProvider.Action.RESET);
     private final List<YSQLProvider.Action> diskActions = Arrays.asList(YSQLProvider.Action.TRUNCATE,
             YSQLProvider.Action.VACUUM);

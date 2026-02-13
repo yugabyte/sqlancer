@@ -76,6 +76,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             case PARALLEL_QUERY_TEST:
                 nrPerformed = r.getInteger(0, 1);
                 break;
+            case ALTER_DATABASE:
+                nrPerformed = r.getInteger(0, 3);
+                break;
             case ALTER_TABLE:
                 nrPerformed = r.getInteger(0, 5);
                 break;
@@ -440,7 +443,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create),
         REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
-        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest);
+        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
+        ALTER_DATABASE(YSQLAlterDatabaseGenerator::create);
         // YugabyteDB 2025.1 new features
         // Simplified vector testing (full vector support requires vector column type)
 //        VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
