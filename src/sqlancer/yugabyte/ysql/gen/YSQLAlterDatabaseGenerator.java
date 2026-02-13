@@ -18,7 +18,7 @@ public final class YSQLAlterDatabaseGenerator {
         // Security
         ROW_SECURITY("row_security", "'on'", "'off'"),
         // Locale/Format
-        DATE_STYLE("DateStyle", "'ISO, MDY'", "'ISO, DMY'", "'Postgres, MDY'", "'SQL, MDY'"),
+        DATE_STYLE("DateStyle", "'ISO, MDY'", "'ISO, DMY'", "'ISO, Postgres, MDY'", "'ISO, SQL, MDY'"),
         TIME_ZONE("TimeZone", "'UTC'", "'America/New_York'", "'Europe/London'", "'Asia/Tokyo'"),
         INTERVAL_STYLE("IntervalStyle", "'postgres'", "'sql_standard'", "'postgres_verbose'", "'iso_8601'"),
         // Timeouts

@@ -58,10 +58,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 
     public static int mapActions(YSQLGlobalState globalState, Action a) {
         Randomly r = globalState.getRandomly();
+        boolean isCatalogTest = CATALOG.equals(
+                globalState.getDbmsSpecificOptions().oracle.get(0));
         int nrPerformed;
         switch (a) {
             case CREATE_INDEX:
-                nrPerformed = r.getInteger(0, 3);
+                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 3);
                 break;
             case DISCARD:
             case DROP_INDEX:
@@ -80,7 +82,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                 nrPerformed = r.getInteger(0, 3);
                 break;
             case ALTER_TABLE:
-                nrPerformed = r.getInteger(0, 5);
+                nrPerformed = isCatalogTest ? r.getInteger(0, 20) : r.getInteger(0, 5);
                 break;
             case RESET:
                 nrPerformed = r.getInteger(0, 3);
@@ -97,15 +99,17 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 //            case NOTIFY:
 //            case LISTEN:
 //            case UNLISTEN:
-            case CREATE_SEQUENCE:
             case TRUNCATE:
                 nrPerformed = r.getInteger(0, 15);
+                break;
+            case CREATE_SEQUENCE:
+                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 15);
                 break;
             // case MERGE:
             //     nrPerformed = r.getInteger(0, 10);
             //     break;
             case CREATE_VIEW:
-                nrPerformed = r.getInteger(0, 5);
+                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 5);
                 break;
             case REFRESH_VIEW:
                 nrPerformed = r.getInteger(0, 20);
@@ -133,7 +137,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     public void generateDatabase(YSQLGlobalState globalState) throws Exception {
         if (globalState.getDbmsSpecificOptions().createDatabases) {
             readFunctions(globalState);
-            createTables(globalState, Randomly.fromOptions(4, 5, 6));
+            boolean isCatalogTest = CATALOG.equals(
+                    globalState.getDbmsSpecificOptions().oracle.get(0));
+            int numTables = isCatalogTest
+                    ? Randomly.fromOptions(100, 110, 120)
+                    : Randomly.fromOptions(4, 5, 6);
+            createTables(globalState, numTables);
             prepareTables(globalState);
         }
     }
@@ -345,11 +354,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         StringBuilder sb = new StringBuilder();
         sb.append("CREATE DATABASE ").append(databaseName).append(" ");
         if (CATALOG.equals(state.getDbmsSpecificOptions().oracle.get(0))) {
-            // Force colocation true if CATALOG test is selected
-            sb.append("WITH ");
-            if (Randomly.getPercentage() > 0.05) {
-                sb.append("COLOCATION = true ");
-            }
+            // Always colocate for CATALOG tests - many tables benefit from colocation
+            sb.append("WITH COLOCATION = true ");
 
             if (Randomly.getBoolean() && state.getDbmsSpecificOptions().testCollations) {
                 if (Randomly.getBoolean()) {
