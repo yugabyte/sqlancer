@@ -14,6 +14,8 @@ public final class YSQLErrors {
         errors.add("An I/O error occurred while sending to the backend");
         errors.add("RPC");
         errors.add("lost connection to parallel worker");
+        errors.add("This connection has been closed.");
+        errors.add("terminating connection due to administrator command");
     }
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {
@@ -117,6 +119,9 @@ public final class YSQLErrors {
         errors.add("Deadlock");
         errors.add("deadlock");
         errors.add("Statement timeout while waiting for lock");
+        // Timeout errors
+        errors.add("canceling statement due to statement timeout");
+        errors.add("canceling statement due to lock timeout");
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {

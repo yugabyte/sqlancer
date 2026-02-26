@@ -424,25 +424,34 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         SET(YSQLSetGenerator::create), // TODO insert yugabyte sets
         SET_CONSTRAINTS((g) -> {
             String sb = "SET CONSTRAINTS ALL " + Randomly.fromOptions("DEFERRED", "IMMEDIATE");
-            return new SQLQueryAdapter(sb, ExpectedErrors.from(
-                "SET CONSTRAINTS is not supported yet",
-                "result of range union would not be contiguous",
-                "current transaction is aborted",
-                "there is no unique or exclusion constraint"
-            ));
+            ExpectedErrors errors = new ExpectedErrors();
+            errors.add("SET CONSTRAINTS is not supported yet");
+            errors.add("result of range union would not be contiguous");
+            errors.add("current transaction is aborted");
+            errors.add("there is no unique or exclusion constraint");
+            YSQLErrors.addTransactionErrors(errors);
+            return new SQLQueryAdapter(sb, errors);
         }), //
         SET_TRANSACTION(YSQLTransactionGenerator::setTransactionMode), //
-        RESET_ROLE((g) -> new SQLQueryAdapter("RESET ROLE", ExpectedErrors.from(
-            "This statement not supported yet",
-            "current transaction is aborted"
-        ))), //
+        RESET_ROLE((g) -> {
+            ExpectedErrors errors = new ExpectedErrors();
+            errors.add("This statement not supported yet");
+            errors.add("current transaction is aborted");
+            YSQLErrors.addTransactionErrors(errors);
+            return new SQLQueryAdapter("RESET ROLE", errors);
+        }), //
         COMMENT_ON(YSQLCommentGenerator::generate), //
-        RESET((g) -> new SQLQueryAdapter("RESET ALL", ExpectedErrors.from(
-                "current transaction is aborted, commands ignored until end of transaction block",
-                "RESET ALL cannot run inside a transaction block")) /*
-         * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
-         * configuration parameter
-         */), //
+        RESET((g) -> {
+            ExpectedErrors errors = new ExpectedErrors();
+            errors.add("current transaction is aborted, commands ignored until end of transaction block");
+            errors.add("RESET ALL cannot run inside a transaction block");
+            YSQLErrors.addTransactionErrors(errors);
+            return new SQLQueryAdapter("RESET ALL", errors);
+            /*
+             * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
+             * configuration parameter
+             */
+        }), //
         //        NOTIFY(YSQLNotifyGenerator::createNotify), //
 //        LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
 //        UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //

@@ -51,6 +51,11 @@ public final class YSQLSetGenerator {
         errors.add("is not accessible");
         errors.add("permission denied");
         errors.add("parameter cannot be changed without restarting the server");
+        // JDBC driver errors when session parameters are changed to incompatible values
+        errors.add("The server's client_encoding parameter was changed to");
+        errors.add("The server's DateStyle parameter was changed to");
+        // YugabyteDB follower read configuration error
+        errors.add("cannot enable yb_read_from_followers with a staleness of less than");
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addCommonExpressionErrors(errors);
 
