@@ -84,19 +84,16 @@ public class SQLQueryAdapter extends Query<SQLConnection> {
     @Override
     public <G extends GlobalState<?, ?, SQLConnection>> boolean execute(G globalState, String... fills)
             throws SQLException {
-        Statement s;
-        if (fills.length > 0) {
-            s = globalState.getConnection().prepareStatement(fills[0]);
-            for (int i = 1; i < fills.length; i++) {
-                ((PreparedStatement) s).setString(i, fills[i]);
-            }
-        } else {
-            s = globalState.getConnection().createStatement();
-        }
+        Statement s = null;
         try {
             if (fills.length > 0) {
+                s = globalState.getConnection().prepareStatement(fills[0]);
+                for (int i = 1; i < fills.length; i++) {
+                    ((PreparedStatement) s).setString(i, fills[i]);
+                }
                 ((PreparedStatement) s).execute();
             } else {
+                s = globalState.getConnection().createStatement();
                 s.execute(query);
             }
             Main.nrSuccessfulActions.addAndGet(1);
@@ -106,7 +103,9 @@ public class SQLQueryAdapter extends Query<SQLConnection> {
             checkException(e);
             return false;
         } finally {
-            s.close();
+            if (s != null) {
+                s.close();
+            }
         }
     }
 
@@ -127,20 +126,17 @@ public class SQLQueryAdapter extends Query<SQLConnection> {
     @Override
     public <G extends GlobalState<?, ?, SQLConnection>> SQLancerResultSet executeAndGet(G globalState, String... fills)
             throws SQLException {
-        Statement s;
-        if (fills.length > 0) {
-            s = globalState.getConnection().prepareStatement(fills[0]);
-            for (int i = 1; i < fills.length; i++) {
-                ((PreparedStatement) s).setString(i, fills[i]);
-            }
-        } else {
-            s = globalState.getConnection().createStatement();
-        }
+        Statement s = null;
         ResultSet result;
         try {
             if (fills.length > 0) {
+                s = globalState.getConnection().prepareStatement(fills[0]);
+                for (int i = 1; i < fills.length; i++) {
+                    ((PreparedStatement) s).setString(i, fills[i]);
+                }
                 result = ((PreparedStatement) s).executeQuery();
             } else {
+                s = globalState.getConnection().createStatement();
                 result = s.executeQuery(query);
             }
             Main.nrSuccessfulActions.addAndGet(1);
@@ -149,7 +145,9 @@ public class SQLQueryAdapter extends Query<SQLConnection> {
             }
             return new SQLancerResultSet(result);
         } catch (Exception e) {
-            s.close();
+            if (s != null) {
+                s.close();
+            }
             Main.nrUnsuccessfulActions.addAndGet(1);
             checkException(e);
         }
