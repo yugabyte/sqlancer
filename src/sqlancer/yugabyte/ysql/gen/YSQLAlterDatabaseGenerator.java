@@ -28,19 +28,14 @@ public final class YSQLAlterDatabaseGenerator {
         IDLE_SESSION_TIMEOUT("idle_session_timeout", "'0'", "'60000'", "'300000'"),
         // YugabyteDB Critical
         YB_READ_FROM_FOLLOWERS("yb_read_from_followers", "'on'", "'off'"),
-        YB_FOLLOWER_READ_STALENESS_MS("yb_follower_read_staleness_ms", "'0'", "'10000'", "'30000'", "'60000'"),
+        YB_FOEAD_STALENESS_MS("yb_follower_read_staleness_ms", "'0'", "'10000'", "'30000'", "'60000'"),
         // Query Planning Controls
-        ENABLE_SEQSCAN("enable_seqscan", "'on'", "'off'"),
-        ENABLE_INDEXSCAN("enable_indexscan", "'on'", "'off'"),
+        ENABLE_SEQSCAN("enable_seqscan", "'on'", "'off'"), ENABLE_INDEXSCAN("enable_indexscan", "'on'", "'off'"),
         ENABLE_INDEXONLYSCAN("enable_indexonlyscan", "'on'", "'off'"),
-        ENABLE_BITMAPSCAN("enable_bitmapscan", "'on'", "'off'"),
-        ENABLE_TIDSCAN("enable_tidscan", "'on'", "'off'"),
-        ENABLE_HASHJOIN("enable_hashjoin", "'on'", "'off'"),
-        ENABLE_MERGEJOIN("enable_mergejoin", "'on'", "'off'"),
-        ENABLE_NESTLOOP("enable_nestloop", "'on'", "'off'"),
-        ENABLE_HASHAGG("enable_hashagg", "'on'", "'off'"),
-        ENABLE_SORT("enable_sort", "'on'", "'off'"),
-        ENABLE_MATERIAL("enable_material", "'on'", "'off'"),
+        ENABLE_BITMAPSCAN("enable_bitmapscan", "'on'", "'off'"), ENABLE_TIDSCAN("enable_tidscan", "'on'", "'off'"),
+        ENABLE_HASHJOIN("enable_hashjoin", "'on'", "'off'"), ENABLE_MERGEJOIN("enable_mergejoin", "'on'", "'off'"),
+        ENABLE_NESTLOOP("enable_nestloop", "'on'", "'off'"), ENABLE_HASHAGG("enable_hashagg", "'on'", "'off'"),
+        ENABLE_SORT("enable_sort", "'on'", "'off'"), ENABLE_MATERIAL("enable_material", "'on'", "'off'"),
         // Cost Parameters
         RANDOM_PAGE_COST("random_page_cost", "'1.0'", "'2.0'", "'4.0'", "'1.1'"),
         SEQ_PAGE_COST("seq_page_cost", "'1.0'", "'0.5'", "'2.0'"),
@@ -62,8 +57,7 @@ public final class YSQLAlterDatabaseGenerator {
         YB_ENABLE_HASH_BATCH_IN("yb_enable_hash_batch_in", "'on'", "'off'"),
         YB_ENABLE_BATCHEDNL("yb_enable_batchednl", "'on'", "'off'"),
         YB_BNL_BATCH_SIZE("yb_bnl_batch_size", "'1'", "'128'", "'1024'", "'4096'"),
-        YB_PREFER_BNL("yb_prefer_bnl", "'on'", "'off'"),
-        YB_ENABLE_BITMAPSCAN("yb_enable_bitmapscan", "'on'", "'off'"),
+        YB_PREFER_BNL("yb_prefer_bnl", "'on'", "'off'"), YB_ENABLE_BITMAPSCAN("yb_enable_bitmapscan", "'on'", "'off'"),
         YB_ENABLE_PARALLEL_APPEND("yb_enable_parallel_append", "'on'", "'off'"),
         // Prepared Statement Handling
         PLAN_CACHE_MODE("plan_cache_mode", "'auto'", "'force_generic_plan'", "'force_custom_plan'"),
@@ -74,8 +68,7 @@ public final class YSQLAlterDatabaseGenerator {
         DEFAULT_TABLE_ACCESS_METHOD("default_table_access_method", "'heap'", "'ybheap'"),
         DEFAULT_TABLESPACE("default_tablespace", "''", "'pg_default'"),
         // Locale Variants
-        LC_MONETARY("lc_monetary", "'C'", "'en_US.UTF-8'"),
-        LC_NUMERIC("lc_numeric", "'C'", "'en_US.UTF-8'"),
+        LC_MONETARY("lc_monetary", "'C'", "'en_US.UTF-8'"), LC_NUMERIC("lc_numeric", "'C'", "'en_US.UTF-8'"),
         LC_TIME("lc_time", "'C'", "'en_US.UTF-8'"),
         // Transaction Edge Cases
         DEFAULT_TRANSACTION_DEFERRABLE("default_transaction_deferrable", "'on'", "'off'"),

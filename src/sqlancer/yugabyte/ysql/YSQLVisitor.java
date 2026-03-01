@@ -10,12 +10,13 @@ import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLCte;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
@@ -24,7 +25,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 
 public interface YSQLVisitor {
@@ -81,12 +84,18 @@ public interface YSQLVisitor {
     void visit(YSQLSubquery subquery);
 
     void visit(YSQLBinaryLogicalOperation op);
-    
+
     void visit(YSQLJSONBOperation op);
-    
+
     void visit(YSQLJSONBFunction op);
-    
+
     void visit(YSQLCaseExpression op);
+
+    void visit(YSQLWindowFunctionExpression op);
+
+    void visit(YSQLCte cte);
+
+    void visit(YSQLSetOperation op);
 
     default void visit(YSQLExpression expression) {
         if (expression instanceof YSQLConstant) {
@@ -127,6 +136,12 @@ public interface YSQLVisitor {
             visit((YSQLJSONBFunction) expression);
         } else if (expression instanceof YSQLCaseExpression) {
             visit((YSQLCaseExpression) expression);
+        } else if (expression instanceof YSQLWindowFunctionExpression) {
+            visit((YSQLWindowFunctionExpression) expression);
+        } else if (expression instanceof YSQLCte) {
+            visit((YSQLCte) expression);
+        } else if (expression instanceof YSQLSetOperation) {
+            visit((YSQLSetOperation) expression);
         } else {
             throw new AssertionError(expression);
         }

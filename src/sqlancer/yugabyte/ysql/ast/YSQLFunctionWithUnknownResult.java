@@ -26,7 +26,7 @@ public enum YSQLFunctionWithUnknownResult {
     CURRENT_SCHEMA("current_schema", YSQLDataType.TEXT), // name
     // CURRENT_SCHEMAS("current_schemas", YSQLDataType.TEXT, YSQLDataType.BOOLEAN),
     INET_CLIENT_PORT("inet_client_port", YSQLDataType.INT), INET_SERVER_PORT("inet_server_port", YSQLDataType.INT),
-//    PG_BACKEND_PID("pg_backend_pid", YSQLDataType.INT), PG_CURRENT_LOGFILE("pg_current_logfile", YSQLDataType.TEXT),
+    // PG_BACKEND_PID("pg_backend_pid", YSQLDataType.INT), PG_CURRENT_LOGFILE("pg_current_logfile", YSQLDataType.TEXT),
     // PG_IS_OTHER_TEMP_SCHEMA("pg_is_other_temp_schema", YSQLDataType.BOOLEAN),
     // PG_JIT_AVAILABLE("pg_is_other_temp_schema", YSQLDataType.BOOLEAN),
     PG_NOTIFICATION_QUEUE_USAGE("pg_notification_queue_usage", YSQLDataType.REAL),
@@ -59,7 +59,7 @@ public enum YSQLFunctionWithUnknownResult {
     BIT_LENGTH("bit_length", YSQLDataType.INT, YSQLDataType.BYTEA),
     INITCAP("initcap", YSQLDataType.TEXT, YSQLDataType.TEXT),
     LEFT("left", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT) {
-        @Override  
+        @Override
         public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
             YSQLExpression[] args = new YSQLExpression[2];
             args[0] = gen.generateExpression(depth + 1, YSQLDataType.TEXT);
@@ -174,7 +174,7 @@ public enum YSQLFunctionWithUnknownResult {
     GET_COLUMN_SIZE("get_column_size", YSQLDataType.INT, YSQLDataType.TEXT),
     // PG_DATABASE_SIZE("pg_database_size", YSQLDataType.INT, YSQLDataType.INT);
     // PG_SIZE_BYTES("pg_size_bytes", YSQLDataType.INT, YSQLDataType.TEXT);
-    
+
     // SQL/JSON path functions (PostgreSQL 15+)
     JSON_EXISTS("json_exists", YSQLDataType.BOOLEAN, YSQLDataType.JSONB, YSQLDataType.TEXT),
     JSON_VALUE("json_value", YSQLDataType.TEXT, YSQLDataType.JSONB, YSQLDataType.TEXT),

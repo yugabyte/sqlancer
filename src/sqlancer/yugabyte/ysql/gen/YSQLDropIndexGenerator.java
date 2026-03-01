@@ -33,12 +33,11 @@ public final class YSQLDropIndexGenerator {
             sb.append(" ");
             sb.append(Randomly.fromOptions("CASCADE", "RESTRICT"));
         }
-        ExpectedErrors errors = ExpectedErrors.from("cannot drop desired object(s) because other objects depend on them",
-                "cannot drop index", "does not exist", "Failed DDL operation as requested");
+        ExpectedErrors errors = ExpectedErrors.from(
+                "cannot drop desired object(s) because other objects depend on them", "cannot drop index",
+                "does not exist", "Failed DDL operation as requested");
         YSQLErrors.addTransactionErrors(errors);
-        return new SQLQueryAdapter(sb.toString(),
-                errors,
-                true);
+        return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 
 }

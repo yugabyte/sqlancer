@@ -13,7 +13,7 @@ public class YSQLCaseExpression implements YSQLExpression {
     private final boolean isSimpleCase;
 
     public YSQLCaseExpression(YSQLExpression switchCondition, List<YSQLExpression> conditions,
-                            List<YSQLExpression> results, YSQLExpression elseResult) {
+            List<YSQLExpression> results, YSQLExpression elseResult) {
         if (conditions.size() != results.size()) {
             throw new IllegalArgumentException("conditions and results must have the same size");
         }
@@ -24,16 +24,13 @@ public class YSQLCaseExpression implements YSQLExpression {
         this.isSimpleCase = switchCondition != null;
     }
 
-    public static YSQLCaseExpression createSearchedCase(List<YSQLExpression> conditions,
-                                                       List<YSQLExpression> results,
-                                                       YSQLExpression elseResult) {
+    public static YSQLCaseExpression createSearchedCase(List<YSQLExpression> conditions, List<YSQLExpression> results,
+            YSQLExpression elseResult) {
         return new YSQLCaseExpression(null, conditions, results, elseResult);
     }
 
-    public static YSQLCaseExpression createSimpleCase(YSQLExpression switchCondition,
-                                                      List<YSQLExpression> conditions,
-                                                      List<YSQLExpression> results,
-                                                      YSQLExpression elseResult) {
+    public static YSQLCaseExpression createSimpleCase(YSQLExpression switchCondition, List<YSQLExpression> conditions,
+            List<YSQLExpression> results, YSQLExpression elseResult) {
         return new YSQLCaseExpression(switchCondition, conditions, results, elseResult);
     }
 

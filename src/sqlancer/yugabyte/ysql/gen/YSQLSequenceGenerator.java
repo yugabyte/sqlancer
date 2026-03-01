@@ -23,37 +23,37 @@ public final class YSQLSequenceGenerator {
         sb.append(" IF NOT EXISTS");
         // TODO generate sequence names
         sb.append(" seq");
-        
+
         String dataType = null;
         long typeMinValue = Integer.MIN_VALUE;
         long typeMaxValue = Integer.MAX_VALUE;
-        
+
         if (Randomly.getBoolean()) {
             dataType = Randomly.fromOptions("smallint", "integer", "bigint");
             sb.append(" AS ");
             sb.append(dataType);
-            
+
             // Set type limits
             switch (dataType) {
-                case "smallint":
-                    typeMinValue = -32768;
-                    typeMaxValue = 32767;
-                    break;
-                case "integer":
-                    typeMinValue = Integer.MIN_VALUE;
-                    typeMaxValue = Integer.MAX_VALUE;
-                    break;
-                case "bigint":
-                    typeMinValue = Long.MIN_VALUE;
-                    typeMaxValue = Long.MAX_VALUE;
-                    break;
+            case "smallint":
+                typeMinValue = -32768;
+                typeMaxValue = 32767;
+                break;
+            case "integer":
+                typeMinValue = Integer.MIN_VALUE;
+                typeMaxValue = Integer.MAX_VALUE;
+                break;
+            case "bigint":
+                typeMinValue = Long.MIN_VALUE;
+                typeMaxValue = Long.MAX_VALUE;
+                break;
             }
         }
-        
+
         // Track min/max values to generate valid sequences
         Long minValue = null;
         Long maxValue = null;
-        
+
         if (Randomly.getBoolean()) {
             sb.append(" INCREMENT");
             if (Randomly.getBoolean()) {
@@ -62,10 +62,11 @@ public final class YSQLSequenceGenerator {
             sb.append(" ");
             // Increment can be negative but not zero
             long increment = globalState.getRandomly().getInteger();
-            if (increment == 0) increment = 1;
+            if (increment == 0)
+                increment = 1;
             sb.append(increment);
         }
-        
+
         if (Randomly.getBoolean()) {
             if (Randomly.getBoolean()) {
                 sb.append(" MINVALUE");
@@ -84,7 +85,7 @@ public final class YSQLSequenceGenerator {
                 sb.append(" NO MINVALUE");
             }
         }
-        
+
         if (Randomly.getBoolean()) {
             if (Randomly.getBoolean()) {
                 sb.append(" MAXVALUE");
@@ -93,7 +94,8 @@ public final class YSQLSequenceGenerator {
                     // Ensure maxValue > minValue and within type limits
                     long remainingRange = typeMaxValue - minValue;
                     if (remainingRange > 1) {
-                        maxValue = minValue + 1 + Math.abs(globalState.getRandomly().getInteger()) % Math.min(remainingRange - 1, Integer.MAX_VALUE);
+                        maxValue = minValue + 1 + Math.abs(globalState.getRandomly().getInteger())
+                                % Math.min(remainingRange - 1, Integer.MAX_VALUE);
                     } else {
                         maxValue = typeMaxValue;
                     }
@@ -114,7 +116,7 @@ public final class YSQLSequenceGenerator {
             }
             errors.add("must be less than MAXVALUE");
         }
-        
+
         if (Randomly.getBoolean()) {
             sb.append(" START");
             if (Randomly.getBoolean()) {
@@ -126,7 +128,8 @@ public final class YSQLSequenceGenerator {
                 // Generate start value between min and max
                 long range = maxValue - minValue;
                 if (range > 0) {
-                    startValue = minValue + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
+                    startValue = minValue
+                            + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
                 } else {
                     startValue = minValue;
                 }
@@ -134,7 +137,8 @@ public final class YSQLSequenceGenerator {
                 // Start value should be >= minValue and within type bounds
                 long range = typeMaxValue - minValue;
                 if (range > 0) {
-                    startValue = minValue + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
+                    startValue = minValue
+                            + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
                 } else {
                     startValue = minValue;
                 }
@@ -142,7 +146,8 @@ public final class YSQLSequenceGenerator {
                 // Start value should be <= maxValue and within type bounds
                 long range = maxValue - typeMinValue;
                 if (range > 0) {
-                    startValue = typeMinValue + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
+                    startValue = typeMinValue
+                            + Math.abs(globalState.getRandomly().getInteger()) % Math.min(range, Integer.MAX_VALUE);
                 } else {
                     startValue = maxValue;
                 }
@@ -167,7 +172,7 @@ public final class YSQLSequenceGenerator {
             errors.add("cannot be less than MINVALUE");
             errors.add("cannot be greater than MAXVALUE");
         }
-        
+
         if (Randomly.getBoolean()) {
             sb.append(" CACHE ");
             // Use reasonable cache values (1-10000)

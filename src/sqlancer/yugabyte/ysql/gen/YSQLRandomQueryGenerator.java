@@ -9,11 +9,14 @@ import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLCte;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.ForClause;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
+import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLSetOperation.SetOperationType;
 
 public final class YSQLRandomQueryGenerator {
 
@@ -24,14 +27,28 @@ public final class YSQLRandomQueryGenerator {
         List<YSQLExpression> columns = new ArrayList<>();
         YSQLTables tables = globalState.getSchema().getRandomTableNonEmptyTables();
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(globalState).setColumns(tables.getColumns());
+
+        boolean hasWindowFunction = false;
         for (int i = 0; i < nrColumns; i++) {
-            columns.add(gen.generateExpression(0));
+            if (Randomly.getBooleanWithRatherLowProbability()) {
+                columns.add(gen.generateWindowFunction(0));
+                hasWindowFunction = true;
+            } else {
+                columns.add(gen.generateExpression(0));
+            }
         }
         YSQLSelect select = new YSQLSelect();
-        select.setSelectType(SelectType.getRandom());
-        if (select.getSelectOption() == SelectType.DISTINCT && Randomly.getBoolean()) {
-            select.setDistinctOnClause(gen.generateExpression(0));
+
+        // Avoid DISTINCT when window functions are present
+        if (hasWindowFunction) {
+            select.setSelectType(SelectType.ALL);
+        } else {
+            select.setSelectType(SelectType.getRandom());
+            if (select.getSelectOption() == SelectType.DISTINCT && Randomly.getBoolean()) {
+                select.setDistinctOnClause(gen.generateExpression(0));
+            }
         }
+
         select.setFromList(tables.getTables().stream().map(t -> new YSQLFromTable(t, Randomly.getBoolean()))
                 .collect(Collectors.toList()));
         select.setFetchColumns(columns);
@@ -56,7 +73,62 @@ public final class YSQLRandomQueryGenerator {
         if (Randomly.getBooleanWithRatherLowProbability()) {
             select.setForClause(ForClause.getRandom());
         }
+
+        // ~15% chance to add CTEs
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            addCTEs(select, globalState);
+        }
+
         return select;
+    }
+
+    public static YSQLExpression createRandomSetOperation(YSQLGlobalState globalState) {
+        int nrColumns = Randomly.smallNumber() + 1;
+        YSQLSelect left = createSimpleSelect(nrColumns, globalState);
+        YSQLSelect right = createSimpleSelect(nrColumns, globalState);
+        SetOperationType opType = SetOperationType.getRandom();
+        YSQLSetOperation setOp = new YSQLSetOperation(left, right, opType);
+
+        // Optionally chain a third SELECT
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            YSQLSelect third = createSimpleSelect(nrColumns, globalState);
+            setOp = new YSQLSetOperation(setOp, third, SetOperationType.getRandom());
+        }
+
+        return setOp;
+    }
+
+    private static YSQLSelect createSimpleSelect(int nrColumns, YSQLGlobalState globalState) {
+        List<YSQLExpression> columns = new ArrayList<>();
+        YSQLTables tables = globalState.getSchema().getRandomTableNonEmptyTables();
+        YSQLExpressionGenerator gen = new YSQLExpressionGenerator(globalState).setColumns(tables.getColumns());
+        for (int i = 0; i < nrColumns; i++) {
+            columns.add(gen.generateExpression(0));
+        }
+        YSQLSelect select = new YSQLSelect();
+        select.setSelectType(SelectType.ALL);
+        select.setFromList(tables.getTables().stream().map(t -> new YSQLFromTable(t, Randomly.getBoolean()))
+                .collect(Collectors.toList()));
+        select.setFetchColumns(columns);
+        if (Randomly.getBoolean()) {
+            select.setWhereClause(gen.generateExpression(0, YSQLDataType.BOOLEAN));
+        }
+        if (Randomly.getBoolean()) {
+            select.setLimitClause(YSQLConstant.createIntConstant(Randomly.getPositiveOrZeroNonCachedInteger()));
+        }
+        return select;
+    }
+
+    private static void addCTEs(YSQLSelect select, YSQLGlobalState globalState) {
+        int nrCtes = Randomly.smallNumber() % 3 + 1;
+        List<YSQLCte> ctes = new ArrayList<>();
+        for (int i = 0; i < nrCtes; i++) {
+            String cteName = "cte" + i;
+            int nrColumns = Randomly.smallNumber() + 1;
+            YSQLSelect cteQuery = createSimpleSelect(nrColumns, globalState);
+            ctes.add(new YSQLCte(cteName, cteQuery));
+        }
+        select.setCteList(ctes);
     }
 
 }

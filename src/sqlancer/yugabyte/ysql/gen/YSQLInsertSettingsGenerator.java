@@ -19,13 +19,13 @@ public final class YSQLInsertSettingsGenerator {
      */
     public static SQLQueryAdapter setInsertOnConflictBatchSize(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
-        
+
         if (Randomly.getBoolean()) {
             sb.append("LOCAL ");
         }
-        
+
         sb.append("yb_insert_on_conflict_read_batch_size = ");
-        
+
         // 0 disables batching, aligning with PostgreSQL behavior
         int batchSize = Randomly.fromOptions(0, 1, 10, 50, 100, 256, 512, 1024);
         sb.append(batchSize);
@@ -44,11 +44,11 @@ public final class YSQLInsertSettingsGenerator {
      */
     public static SQLQueryAdapter setInPlaceIndexUpdate(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
-        
+
         if (Randomly.getBoolean()) {
             sb.append("LOCAL ");
         }
-        
+
         sb.append("yb_enable_inplace_index_update = ");
         sb.append(Randomly.fromOptions("true", "false", "on", "off"));
 
@@ -65,11 +65,11 @@ public final class YSQLInsertSettingsGenerator {
      */
     public static SQLQueryAdapter setDDLNonIncrementing(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
-        
+
         if (Randomly.getBoolean()) {
             sb.append("LOCAL ");
         }
-        
+
         sb.append("yb_make_next_ddl_statement_nonincrementing = ");
         sb.append(Randomly.fromOptions("true", "false"));
 

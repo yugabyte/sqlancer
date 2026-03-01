@@ -97,9 +97,7 @@ public final class YSQLInsertGenerator {
             if (Randomly.getBoolean()) {
                 sb.append(" (");
                 List<YSQLColumn> conflictColumns = table.getRandomNonEmptyColumnSubset();
-                sb.append(conflictColumns.stream()
-                        .map(AbstractTableColumn::getName)
-                        .collect(Collectors.joining(", ")));
+                sb.append(conflictColumns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
                 sb.append(")");
             }
             if (Randomly.getBoolean()) {
@@ -116,15 +114,15 @@ public final class YSQLInsertGenerator {
                     if (Randomly.getBoolean()) {
                         sb.append("EXCLUDED.").append(col.getName());
                     } else {
-                        YSQLExpression expr = YSQLExpressionGenerator.generateConstant(
-                                globalState.getRandomly(), col.getType());
+                        YSQLExpression expr = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(),
+                                col.getType());
                         sb.append(YSQLVisitor.asString(expr));
                     }
                 }
                 if (Randomly.getBooleanWithRatherLowProbability()) {
                     sb.append(" WHERE ");
-                    sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(
-                            globalState, table.getColumns(), YSQLDataType.BOOLEAN)));
+                    sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState,
+                            table.getColumns(), YSQLDataType.BOOLEAN)));
                 }
                 errors.add("ON CONFLICT DO UPDATE command cannot affect row a second time");
                 errors.add("ON CONFLICT DO UPDATE requires inference specification or constraint name");
@@ -137,9 +135,8 @@ public final class YSQLInsertGenerator {
                 sb.append("*");
             } else {
                 List<YSQLColumn> returningColumns = table.getRandomNonEmptyColumnSubset();
-                sb.append(returningColumns.stream()
-                        .map(AbstractTableColumn::getName)
-                        .collect(Collectors.joining(", ")));
+                sb.append(
+                        returningColumns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
             }
         }
         return new SQLQueryAdapter(sb.toString(), errors);

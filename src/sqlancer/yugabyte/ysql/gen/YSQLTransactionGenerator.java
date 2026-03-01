@@ -26,16 +26,16 @@ public final class YSQLTransactionGenerator {
     public static SQLQueryAdapter setTransactionMode(YSQLGlobalState globalState) {
         ExpectedErrors errors = new ExpectedErrors();
         StringBuilder sb = new StringBuilder("SET TRANSACTION");
-        
+
         boolean addedProperty = false;
-        
+
         // Add isolation level
         if (Randomly.getBoolean()) {
             sb.append(" ISOLATION LEVEL ");
             sb.append(Randomly.fromOptions("SERIALIZABLE", "REPEATABLE READ", "READ COMMITTED"));
             addedProperty = true;
         }
-        
+
         // Add read/write mode
         if (Randomly.getBoolean()) {
             if (addedProperty) {
@@ -45,7 +45,7 @@ public final class YSQLTransactionGenerator {
             sb.append(Randomly.fromOptions("READ WRITE", "READ ONLY"));
             addedProperty = true;
         }
-        
+
         // Add deferrable mode (only makes sense for SERIALIZABLE READ ONLY)
         if (Randomly.getBooleanWithRatherLowProbability()) {
             if (addedProperty) {
@@ -55,14 +55,14 @@ public final class YSQLTransactionGenerator {
             sb.append(Randomly.fromOptions("DEFERRABLE", "NOT DEFERRABLE"));
             addedProperty = true;
         }
-        
+
         // Ensure at least one property is set
         if (!addedProperty) {
             // Always add at least one property to avoid syntax error
             sb.append(" ISOLATION LEVEL ");
             sb.append(Randomly.fromOptions("SERIALIZABLE", "REPEATABLE READ", "READ COMMITTED"));
         }
-        
+
         errors.add("SET TRANSACTION ISOLATION LEVEL must be called before any query");
         errors.add("cannot use serializable mode in a hot standby");
         errors.add("SET TRANSACTION must be called before any query");

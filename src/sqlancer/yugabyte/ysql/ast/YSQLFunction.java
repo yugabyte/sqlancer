@@ -320,8 +320,10 @@ public class YSQLFunction implements YSQLExpression {
                 String str = evaluatedArgs[0].asString();
                 int start = (int) evaluatedArgs[1].asInt() - 1; // PostgreSQL uses 1-based indexing
                 int length = (int) evaluatedArgs[2].asInt();
-                if (start < 0) start = 0;
-                if (start >= str.length()) return YSQLConstant.createTextConstant("");
+                if (start < 0)
+                    start = 0;
+                if (start >= str.length())
+                    return YSQLConstant.createTextConstant("");
                 int end = Math.min(start + length, str.length());
                 return YSQLConstant.createTextConstant(str.substring(start, end));
             }

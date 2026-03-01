@@ -91,7 +91,7 @@ public final class YSQLIndexGenerator {
         if (hasNullsNotDistinct) {
             sb.append(" NULLS NOT DISTINCT");
         }
-        
+
         // YugabyteDB doesn't support NULLS NOT DISTINCT with INCLUDE clause
         // Also, GIN and HASH indexes don't support INCLUDE at all
         if (Randomly.getBoolean() && method != IndexType.HASH && method != IndexType.GIN && !hasNullsNotDistinct) {

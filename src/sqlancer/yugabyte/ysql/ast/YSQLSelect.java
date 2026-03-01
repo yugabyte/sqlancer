@@ -14,6 +14,15 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
     private List<YSQLJoin> joinClauses = Collections.emptyList();
     private YSQLExpression distinctOnClause;
     private ForClause forClause;
+    private List<YSQLCte> cteList = Collections.emptyList();
+
+    public List<YSQLCte> getCteList() {
+        return cteList;
+    }
+
+    public void setCteList(List<YSQLCte> cteList) {
+        this.cteList = cteList;
+    }
 
     public void setSelectType(SelectType fromOptions) {
         this.setSelectOption(fromOptions);

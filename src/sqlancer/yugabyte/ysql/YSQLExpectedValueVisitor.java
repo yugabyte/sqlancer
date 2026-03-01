@@ -5,13 +5,14 @@ import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLCte;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
@@ -20,7 +21,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 
 public final class YSQLExpectedValueVisitor implements YSQLVisitor {
 
@@ -147,14 +150,14 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
         visit(op.getLeft());
         visit(op.getRight());
     }
-    
+
     @Override
     public void visit(YSQLJSONBOperation op) {
         print(op);
         visit(op.getLeft());
         visit(op.getRight());
     }
-    
+
     @Override
     public void visit(YSQLJSONBFunction op) {
         print(op);
@@ -162,7 +165,7 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
             visit(arg);
         }
     }
-    
+
     @Override
     public void visit(YSQLCaseExpression op) {
         print(op);
@@ -178,6 +181,31 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
         if (op.getElseResult() != null) {
             visit(op.getElseResult());
         }
+    }
+
+    @Override
+    public void visit(YSQLWindowFunctionExpression op) {
+        print(op);
+        visit(op.getBaseWindowFunction());
+        for (YSQLExpression expr : op.getPartitionBy()) {
+            visit(expr);
+        }
+        for (YSQLExpression expr : op.getOrderBy()) {
+            visit(expr);
+        }
+    }
+
+    @Override
+    public void visit(YSQLCte cte) {
+        print(cte);
+        visit(cte.getQuery());
+    }
+
+    @Override
+    public void visit(YSQLSetOperation op) {
+        print(op);
+        visit(op.getLeft());
+        visit(op.getRight());
     }
 
     public String get() {

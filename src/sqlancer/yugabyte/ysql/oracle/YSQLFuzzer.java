@@ -11,6 +11,7 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLProvider;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
+import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.gen.YSQLRandomQueryGenerator;
 
 public class YSQLFuzzer implements TestOracle<YSQLGlobalState> {
@@ -26,6 +27,9 @@ public class YSQLFuzzer implements TestOracle<YSQLGlobalState> {
         YSQLErrors.addGroupingErrors(errors);
         YSQLErrors.addViewErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addWindowFunctionErrors(errors);
+        YSQLErrors.addCTEErrors(errors);
+        YSQLErrors.addSetOperationErrors(errors);
 
         // remove timeout error from scope
         errors.add("canceling statement due to statement timeout");
@@ -74,10 +78,13 @@ public class YSQLFuzzer implements TestOracle<YSQLGlobalState> {
 
         @Override
         public SQLQueryAdapter getQuery(YSQLGlobalState state, ExpectedErrors errors) throws Exception {
-            return new SQLQueryAdapter(
-                    YSQLVisitor.asString(YSQLRandomQueryGenerator.createRandomQuery(Randomly.smallNumber() + 1, state))
-                            + ";",
-                    errors);
+            YSQLExpression query;
+            if (Randomly.getBooleanWithRatherLowProbability()) {
+                query = YSQLRandomQueryGenerator.createRandomSetOperation(state);
+            } else {
+                query = YSQLRandomQueryGenerator.createRandomQuery(Randomly.smallNumber() + 1, state);
+            }
+            return new SQLQueryAdapter(YSQLVisitor.asString(query) + ";", errors);
         }
     }
 }

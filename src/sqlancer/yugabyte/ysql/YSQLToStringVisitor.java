@@ -11,13 +11,14 @@ import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
-import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLCte;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin.YSQLJoinType;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
@@ -28,7 +29,12 @@ import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecBetween;
+import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecTerm;
 
 public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> implements YSQLVisitor {
 
@@ -71,6 +77,17 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
 
     @Override
     public void visit(YSQLSelect s) {
+        if (!s.getCteList().isEmpty()) {
+            sb.append("WITH ");
+            List<YSQLCte> ctes = s.getCteList();
+            for (int i = 0; i < ctes.size(); i++) {
+                if (i != 0) {
+                    sb.append(", ");
+                }
+                visit(ctes.get(i));
+            }
+            sb.append(" ");
+        }
         sb.append("SELECT ");
         switch (s.getSelectOption()) {
         case DISTINCT:
@@ -276,12 +293,12 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
     public void visit(YSQLBinaryLogicalOperation op) {
         super.visit((BinaryOperation<YSQLExpression>) op);
     }
-    
+
     @Override
     public void visit(YSQLJSONBOperation op) {
         super.visit((BinaryOperation<YSQLExpression>) op);
     }
-    
+
     @Override
     public void visit(YSQLJSONBFunction func) {
         sb.append(func.getFunctionName());
@@ -295,20 +312,20 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         }
         sb.append(")");
     }
-    
+
     @Override
     public void visit(YSQLCaseExpression expr) {
         sb.append("CASE ");
-        
+
         // Simple CASE (CASE expr WHEN val1 THEN result1 ...)
         if (expr.isSimpleCase()) {
             visit(expr.getSwitchCondition());
             sb.append(" ");
         }
-        
+
         List<YSQLExpression> conditions = expr.getConditions();
         List<YSQLExpression> results = expr.getResults();
-        
+
         for (int i = 0; i < conditions.size(); i++) {
             sb.append("WHEN ");
             visit(conditions.get(i));
@@ -316,14 +333,111 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             visit(results.get(i));
             sb.append(" ");
         }
-        
+
         if (expr.getElseResult() != null) {
             sb.append("ELSE ");
             visit(expr.getElseResult());
             sb.append(" ");
         }
-        
+
         sb.append("END");
+    }
+
+    @Override
+    public void visit(YSQLWindowFunctionExpression expr) {
+        YSQLExpression baseFunc = expr.getBaseWindowFunction();
+        if (baseFunc instanceof YSQLWindowFunction) {
+            YSQLWindowFunction wf = (YSQLWindowFunction) baseFunc;
+            sb.append(wf.getFunc().name());
+            sb.append("(");
+            YSQLExpression[] args = wf.getArgs();
+            for (int i = 0; i < args.length; i++) {
+                if (i != 0) {
+                    sb.append(", ");
+                }
+                visit(args[i]);
+            }
+            sb.append(")");
+        } else {
+            visit(baseFunc);
+        }
+        sb.append(" OVER (");
+        if (!expr.getPartitionBy().isEmpty()) {
+            sb.append("PARTITION BY ");
+            visit(expr.getPartitionBy());
+        }
+        if (!expr.getOrderBy().isEmpty()) {
+            if (!expr.getPartitionBy().isEmpty()) {
+                sb.append(" ");
+            }
+            sb.append("ORDER BY ");
+            visit(expr.getOrderBy());
+        }
+        if (expr.getFrameSpecKind() != null) {
+            sb.append(" ");
+            sb.append(expr.getFrameSpecKind().name());
+            sb.append(" ");
+            if (expr.getFrameSpec() != null) {
+                visitFrameSpec(expr.getFrameSpec());
+            }
+            if (expr.getExclude() != null) {
+                sb.append(" ");
+                sb.append(expr.getExclude().getString());
+            }
+        }
+        sb.append(")");
+    }
+
+    private void visitFrameSpec(YSQLExpression frameSpec) {
+        if (frameSpec instanceof YSQLWindowFunctionFrameSpecBetween) {
+            YSQLWindowFunctionFrameSpecBetween between = (YSQLWindowFunctionFrameSpecBetween) frameSpec;
+            sb.append("BETWEEN ");
+            visitFrameSpecTerm(between.getLeft());
+            sb.append(" AND ");
+            visitFrameSpecTerm(between.getRight());
+        } else if (frameSpec instanceof YSQLWindowFunctionFrameSpecTerm) {
+            visitFrameSpecTerm((YSQLWindowFunctionFrameSpecTerm) frameSpec);
+        }
+    }
+
+    private void visitFrameSpecTerm(YSQLWindowFunctionFrameSpecTerm term) {
+        switch (term.getKind()) {
+        case EXPR_PRECEDING:
+            visit(term.getExpression());
+            sb.append(" PRECEDING");
+            break;
+        case EXPR_FOLLOWING:
+            visit(term.getExpression());
+            sb.append(" FOLLOWING");
+            break;
+        default:
+            sb.append(term.getKind().getString());
+            break;
+        }
+    }
+
+    @Override
+    public void visit(YSQLCte cte) {
+        sb.append(cte.getName());
+        if (cte.getColumnNames() != null && !cte.getColumnNames().isEmpty()) {
+            sb.append("(");
+            sb.append(String.join(", ", cte.getColumnNames()));
+            sb.append(")");
+        }
+        sb.append(" AS (");
+        visit(cte.getQuery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLSetOperation op) {
+        sb.append("(");
+        visit(op.getLeft());
+        sb.append(") ");
+        sb.append(op.getType().getTextRepresentation());
+        sb.append(" (");
+        visit(op.getRight());
+        sb.append(")");
     }
 
     private void appendType(YSQLCastOperation cast) {

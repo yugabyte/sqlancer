@@ -66,16 +66,14 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
     protected void updateValue(YSQLColumn column) {
         YSQLDataType type = column.getType();
         // For special types that can't be cast from arbitrary expressions, use constants
-        boolean isSpecialType = type == YSQLDataType.RANGE || type == YSQLDataType.INT4RANGE || 
-                               type == YSQLDataType.INT8RANGE || type == YSQLDataType.NUMRANGE ||
-                               type == YSQLDataType.TSRANGE || type == YSQLDataType.TSTZRANGE || 
-                               type == YSQLDataType.DATERANGE || type == YSQLDataType.CIDR ||
-                               type == YSQLDataType.INET || type == YSQLDataType.MACADDR ||
-                               type == YSQLDataType.UUID || type == YSQLDataType.POINT ||
-                               type == YSQLDataType.LINE || type == YSQLDataType.LSEG ||
-                               type == YSQLDataType.BOX || type == YSQLDataType.PATH ||
-                               type == YSQLDataType.POLYGON || type == YSQLDataType.CIRCLE;
-        
+        boolean isSpecialType = type == YSQLDataType.RANGE || type == YSQLDataType.INT4RANGE
+                || type == YSQLDataType.INT8RANGE || type == YSQLDataType.NUMRANGE || type == YSQLDataType.TSRANGE
+                || type == YSQLDataType.TSTZRANGE || type == YSQLDataType.DATERANGE || type == YSQLDataType.CIDR
+                || type == YSQLDataType.INET || type == YSQLDataType.MACADDR || type == YSQLDataType.UUID
+                || type == YSQLDataType.POINT || type == YSQLDataType.LINE || type == YSQLDataType.LSEG
+                || type == YSQLDataType.BOX || type == YSQLDataType.PATH || type == YSQLDataType.POLYGON
+                || type == YSQLDataType.CIRCLE;
+
         if (!Randomly.getBoolean() || isSpecialType) {
             YSQLExpression constant = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(),
                     column.getType());

@@ -29,10 +29,10 @@ public final class YSQLMergeGenerator {
         StringBuilder sb = new StringBuilder("MERGE INTO ");
         sb.append(targetTable.getName());
         sb.append(" AS target");
-        
+
         // Add source - either a table or VALUES clause
         sb.append(" USING ");
-        
+
         boolean useValuesClause = Randomly.getBoolean();
         if (useValuesClause || globalState.getSchema().getDatabaseTables().size() == 1) {
             // Use VALUES clause
@@ -48,8 +48,8 @@ public final class YSQLMergeGenerator {
                     if (j > 0) {
                         sb.append(", ");
                     }
-                    YSQLExpression expr = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), 
-                                                                                   columns.get(j).getType());
+                    YSQLExpression expr = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(),
+                            columns.get(j).getType());
                     sb.append(YSQLVisitor.asString(expr));
                 }
                 sb.append(")");
@@ -68,18 +68,18 @@ public final class YSQLMergeGenerator {
             sb.append(sourceTable.getName());
             sb.append(" AS source");
         }
-        
+
         // ON clause
         sb.append(" ON ");
         YSQLExpression joinCondition = YSQLExpressionGenerator.generateExpression(globalState, YSQLDataType.BOOLEAN);
         sb.append(YSQLVisitor.asString(joinCondition));
-        
+
         // WHEN clauses - ensure at least one WHEN clause is present
         boolean hasWhenMatched = Randomly.getBoolean();
         boolean hasWhenNotMatchedByTarget = Randomly.getBoolean();
         // WHEN NOT MATCHED BY SOURCE is PostgreSQL 15 feature, not in YugabyteDB yet
         boolean hasWhenNotMatchedBySource = false;
-        
+
         // If no WHEN clause was selected, force at least one
         if (!hasWhenMatched && !hasWhenNotMatchedByTarget) {
             // Randomly select one to be true
@@ -89,16 +89,17 @@ public final class YSQLMergeGenerator {
                 hasWhenNotMatchedByTarget = true;
             }
         }
-        
+
         if (hasWhenMatched) {
             sb.append(" WHEN MATCHED");
             if (Randomly.getBoolean()) {
                 sb.append(" AND ");
-                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState, YSQLDataType.BOOLEAN);
+                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState,
+                        YSQLDataType.BOOLEAN);
                 sb.append(YSQLVisitor.asString(condition));
             }
             sb.append(" THEN ");
-            
+
             if (Randomly.getBoolean()) {
                 // UPDATE
                 sb.append("UPDATE SET ");
@@ -124,23 +125,25 @@ public final class YSQLMergeGenerator {
                 sb.append("DELETE");
             }
         }
-        
+
         if (hasWhenNotMatchedByTarget) {
             sb.append(" WHEN NOT MATCHED");
             if (Randomly.getBoolean()) {
                 sb.append(" AND ");
-                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState, YSQLDataType.BOOLEAN);
+                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState,
+                        YSQLDataType.BOOLEAN);
                 sb.append(YSQLVisitor.asString(condition));
             }
             sb.append(" THEN INSERT");
-            
-            List<YSQLColumn> columns = Randomly.getBoolean() ? targetTable.getColumns() : targetTable.getRandomNonEmptyColumnSubset();
+
+            List<YSQLColumn> columns = Randomly.getBoolean() ? targetTable.getColumns()
+                    : targetTable.getRandomNonEmptyColumnSubset();
             if (columns.size() < targetTable.getColumns().size()) {
                 sb.append(" (");
                 sb.append(columns.stream().map(YSQLColumn::getName).collect(Collectors.joining(", ")));
                 sb.append(")");
             }
-            
+
             sb.append(" VALUES (");
             for (int i = 0; i < columns.size(); i++) {
                 if (i > 0) {
@@ -150,22 +153,24 @@ public final class YSQLMergeGenerator {
                     sb.append("source.");
                     sb.append(columns.get(i).getName());
                 } else {
-                    YSQLExpression expr = YSQLExpressionGenerator.generateExpression(globalState, columns.get(i).getType());
+                    YSQLExpression expr = YSQLExpressionGenerator.generateExpression(globalState,
+                            columns.get(i).getType());
                     sb.append(YSQLVisitor.asString(expr));
                 }
             }
             sb.append(")");
         }
-        
+
         if (hasWhenNotMatchedBySource) {
             sb.append(" WHEN NOT MATCHED BY SOURCE");
             if (Randomly.getBoolean()) {
                 sb.append(" AND ");
-                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState, YSQLDataType.BOOLEAN);
+                YSQLExpression condition = YSQLExpressionGenerator.generateExpression(globalState,
+                        YSQLDataType.BOOLEAN);
                 sb.append(YSQLVisitor.asString(condition));
             }
             sb.append(" THEN ");
-            
+
             if (Randomly.getBoolean()) {
                 // UPDATE
                 sb.append("UPDATE SET ");
@@ -179,7 +184,7 @@ public final class YSQLMergeGenerator {
                 sb.append("DELETE");
             }
         }
-        
+
         // Add common MERGE errors
         errors.add("MERGE is not supported");
         errors.add("This statement not supported yet"); // YugabyteDB specific error
@@ -193,10 +198,10 @@ public final class YSQLMergeGenerator {
         errors.add("column used in WHEN AND condition must appear in USING clause");
         errors.add("target row matched more than once");
         errors.add("WHEN NOT MATCHED BY SOURCE is not supported");
-        
+
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonInsertUpdateErrors(errors);
-        
+
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 }

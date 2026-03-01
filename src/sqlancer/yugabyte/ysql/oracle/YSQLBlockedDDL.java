@@ -28,11 +28,12 @@ public class YSQLBlockedDDL implements TestOracle<YSQLGlobalState> {
 
     private final List<YSQLProvider.Action> dmlActions = Arrays.asList(YSQLProvider.Action.INSERT,
             YSQLProvider.Action.UPDATE, YSQLProvider.Action.DELETE);
-    private final List<YSQLProvider.Action> catalogActions = Arrays.asList(YSQLProvider.Action.TRUNCATE, YSQLProvider.Action.CREATE_VIEW,
-            YSQLProvider.Action.REFRESH_VIEW, YSQLProvider.Action.CREATE_SEQUENCE, YSQLProvider.Action.ALTER_TABLE,
-            YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON);
+    private final List<YSQLProvider.Action> catalogActions = Arrays.asList(YSQLProvider.Action.TRUNCATE,
+            YSQLProvider.Action.CREATE_VIEW, YSQLProvider.Action.REFRESH_VIEW, YSQLProvider.Action.CREATE_SEQUENCE,
+            YSQLProvider.Action.ALTER_TABLE, YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON);
     private final List<YSQLProvider.Action> allowedDdls = Arrays.asList(YSQLProvider.Action.RESET_ROLE,
-            YSQLProvider.Action.VACUUM, YSQLProvider.Action.DISCARD, YSQLProvider.Action.RESET, YSQLProvider.Action.SET_CONSTRAINTS);
+            YSQLProvider.Action.VACUUM, YSQLProvider.Action.DISCARD, YSQLProvider.Action.RESET,
+            YSQLProvider.Action.SET_CONSTRAINTS);
 
     public YSQLBlockedDDL(YSQLGlobalState globalState) {
         globalState.getDbmsSpecificOptions().createDatabases = false;
@@ -123,7 +124,9 @@ public class YSQLBlockedDDL implements TestOracle<YSQLGlobalState> {
             if (state.executeStatement(newQuery)) {
                 if (!mightBeAllowed) {
                     boolean tableFound = false;
-                    if (query.getQueryString().contains("ALTER TABLE") || query.getQueryString().contains("ADD CONSTRAINT") || query.getQueryString().contains("TRUNCATE")) {
+                    if (query.getQueryString().contains("ALTER TABLE")
+                            || query.getQueryString().contains("ADD CONSTRAINT")
+                            || query.getQueryString().contains("TRUNCATE")) {
                         for (String tempTable : tempTables) {
                             if (query.getQueryString().contains(tempTable)) {
                                 tableFound = true;
@@ -135,7 +138,9 @@ public class YSQLBlockedDDL implements TestOracle<YSQLGlobalState> {
                         }
                     }
 
-                    if (!tableFound && !query.getQueryString().contains("DROP INDEX") && !query.getQueryString().contains("VIEW") && !query.getQueryString().contains("COMMENT")) {
+                    if (!tableFound && !query.getQueryString().contains("DROP INDEX")
+                            && !query.getQueryString().contains("VIEW")
+                            && !query.getQueryString().contains("COMMENT")) {
                         // index "i4" does not exist, skipping - not an error
                         throw new AssertionError(query + String.format("%s", !state.executeStatement(newQuery)));
                     }

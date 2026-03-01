@@ -16,6 +16,10 @@ public final class YSQLErrors {
         errors.add("lost connection to parallel worker");
         errors.add("This connection has been closed.");
         errors.add("terminating connection due to administrator command");
+        errors.add("is not a partition of relation");
+        errors.add("marked for deletion");
+        errors.add("hit the limit");
+        errors.add("insufficient disk space");
     }
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {
@@ -112,6 +116,7 @@ public final class YSQLErrors {
         errors.add("Transaction aborted");
         errors.add("Transaction conflicted");
         errors.add("current transaction is aborted, commands ignored until end of transaction block");
+        errors.add("current transaction is expired or aborted");
         // Wait-on-Conflict errors
         errors.add("Wait queue operation failed");
         errors.add("yb_enable_wait_queues must be enabled");
@@ -215,7 +220,7 @@ public final class YSQLErrors {
         errors.add("a negative number raised to a non-integer power yields a complex result");
         errors.add("could not determine polymorphic type because input has type unknown");
         errors.add("input of anonymous composite types is not implemented");
-        
+
         // Ordering errors for types that don't have natural ordering
         errors.add("could not identify an ordering operator for type circle");
         errors.add("could not identify an ordering operator for type");
@@ -298,6 +303,47 @@ public final class YSQLErrors {
         errors.add("must appear in the GROUP BY clause or be used in an aggregate function");
         errors.add("is not in select list");
         errors.add("aggregate functions are not allowed in GROUP BY");
+    }
+
+    public static void addWindowFunctionErrors(ExpectedErrors errors) {
+        errors.add("window functions are not allowed in WHERE");
+        errors.add("window functions are not allowed in HAVING");
+        errors.add("window functions are not allowed in GROUP BY");
+        errors.add("window function calls cannot be nested");
+        errors.add("FILTER is not implemented for non-aggregate window functions");
+        errors.add("frame starting from following row cannot end with current row");
+        errors.add("frame end cannot be UNBOUNDED PRECEDING");
+        errors.add("frame starting offset must not be negative");
+        errors.add("RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column");
+        errors.add("window functions are not allowed in functions in FROM");
+        errors.add("GROUPS mode requires an ORDER BY clause");
+        errors.add("window function requires an OVER clause");
+        errors.add("column must appear in the GROUP BY clause or be used in an aggregate function");
+    }
+
+    public static void addCTEErrors(ExpectedErrors errors) {
+        errors.add("WITH query name");
+        errors.add("specified more than once");
+        errors.add("recursive query");
+        errors.add("recursive reference to query");
+        errors.add("WITH clause containing a data-modifying statement must be at the top level");
+        errors.add("does not have the form non-recursive-term UNION");
+        errors.add("relation");
+    }
+
+    public static void addSetOperationErrors(ExpectedErrors errors) {
+        errors.add("each UNION query must have the same number of columns");
+        errors.add("each INTERSECT query must have the same number of columns");
+        errors.add("each EXCEPT query must have the same number of columns");
+        errors.add("UNION types");
+        errors.add("cannot be matched");
+        errors.add("could not find a function to convert type");
+        errors.add("could not convert type");
+        errors.add("set-returning functions are not allowed in");
+        errors.add("FOR UPDATE is not allowed with UNION/INTERSECT/EXCEPT");
+        errors.add("ORDER BY position");
+        errors.add("is ambiguous");
+        errors.add("INTERSECT or EXCEPT member statement cannot refer to other relations of same query level");
     }
 
     public static void addViewErrors(ExpectedErrors errors) {

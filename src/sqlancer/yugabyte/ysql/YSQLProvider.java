@@ -24,8 +24,8 @@ import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
 public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOptions> {
 
     /**
-     * Global lock for database creation - YugabyteDB cannot create multiple databases simultaneously
-     * due to catalog version conflicts across the distributed system.
+     * Global lock for database creation - YugabyteDB cannot create multiple databases simultaneously due to catalog
+     * version conflicts across the distributed system.
      */
     private static final Object DATABASE_CREATION_LOCK = new Object();
 
@@ -58,76 +58,75 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 
     public static int mapActions(YSQLGlobalState globalState, Action a) {
         Randomly r = globalState.getRandomly();
-        boolean isCatalogTest = CATALOG.equals(
-                globalState.getDbmsSpecificOptions().oracle.get(0));
+        boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
         int nrPerformed;
         switch (a) {
-            case CREATE_INDEX:
-                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 3);
-                break;
-            case DISCARD:
-            case DROP_INDEX:
-                nrPerformed = r.getInteger(0, 5);
-                break;
-            case COMMIT:
-                nrPerformed = r.getInteger(0, 3);
-                break;
-            case SET_TRANSACTION:
-                nrPerformed = r.getInteger(0, 2);
-                break;
-            case PARALLEL_QUERY_TEST:
-                nrPerformed = r.getInteger(0, 1);
-                break;
-            case ALTER_DATABASE:
-                nrPerformed = r.getInteger(0, 3);
-                break;
-            case ALTER_TABLE:
-                nrPerformed = isCatalogTest ? r.getInteger(0, 20) : r.getInteger(0, 5);
-                break;
-            case RESET:
-                nrPerformed = r.getInteger(0, 3);
-                break;
-            case ANALYZE:
-                nrPerformed = r.getInteger(0, 3);
-                break;
-            case DELETE:
-            case RESET_ROLE:
-            case VACUUM:
-            case SET_CONSTRAINTS:
-            case SET:
-            case COMMENT_ON:
-//            case NOTIFY:
-//            case LISTEN:
-//            case UNLISTEN:
-            case TRUNCATE:
-                nrPerformed = r.getInteger(0, 15);
-                break;
-            case CREATE_SEQUENCE:
-                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 15);
-                break;
-            // case MERGE:
-            //     nrPerformed = r.getInteger(0, 10);
-            //     break;
-            case CREATE_VIEW:
-                nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 5);
-                break;
-            case REFRESH_VIEW:
-                nrPerformed = r.getInteger(0, 20);
-                break;
-            case UPDATE:
-                nrPerformed = r.getInteger(0, 20);
-                break;
-            case INSERT:
-                nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
-                break;
-                // YugabyteDB 2025.1 new features
-//            case VECTOR_SYNTAX_TEST:
-//            case VECTOR_INDEX_SYNTAX:
-//            case VECTOR_SETTINGS:
-//                nrPerformed = r.getInteger(0, 2);  // Less frequent as these will mostly error
-//                break;
-            default:
-                throw new AssertionError(a);
+        case CREATE_INDEX:
+            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 3);
+            break;
+        case DISCARD:
+        case DROP_INDEX:
+            nrPerformed = r.getInteger(0, 5);
+            break;
+        case COMMIT:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case SET_TRANSACTION:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case PARALLEL_QUERY_TEST:
+            nrPerformed = r.getInteger(0, 1);
+            break;
+        case ALTER_DATABASE:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case ALTER_TABLE:
+            nrPerformed = isCatalogTest ? r.getInteger(0, 20) : r.getInteger(0, 5);
+            break;
+        case RESET:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case ANALYZE:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case DELETE:
+        case RESET_ROLE:
+        case VACUUM:
+        case SET_CONSTRAINTS:
+        case SET:
+        case COMMENT_ON:
+            // case NOTIFY:
+            // case LISTEN:
+            // case UNLISTEN:
+        case TRUNCATE:
+            nrPerformed = r.getInteger(0, 15);
+            break;
+        case CREATE_SEQUENCE:
+            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 15);
+            break;
+        // case MERGE:
+        // nrPerformed = r.getInteger(0, 10);
+        // break;
+        case CREATE_VIEW:
+            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 5);
+            break;
+        case REFRESH_VIEW:
+            nrPerformed = r.getInteger(0, 20);
+            break;
+        case UPDATE:
+            nrPerformed = r.getInteger(0, 20);
+            break;
+        case INSERT:
+            nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+            break;
+        // YugabyteDB 2025.1 new features
+        // case VECTOR_SYNTAX_TEST:
+        // case VECTOR_INDEX_SYNTAX:
+        // case VECTOR_SETTINGS:
+        // nrPerformed = r.getInteger(0, 2); // Less frequent as these will mostly error
+        // break;
+        default:
+            throw new AssertionError(a);
         }
         return nrPerformed;
 
@@ -137,11 +136,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     public void generateDatabase(YSQLGlobalState globalState) throws Exception {
         if (globalState.getDbmsSpecificOptions().createDatabases) {
             readFunctions(globalState);
-            boolean isCatalogTest = CATALOG.equals(
-                    globalState.getDbmsSpecificOptions().oracle.get(0));
-            int numTables = isCatalogTest
-                    ? Randomly.fromOptions(100, 110, 120)
-                    : Randomly.fromOptions(4, 5, 6);
+            boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
+            int numTables = isCatalogTest ? Randomly.fromOptions(100, 110, 120) : Randomly.fromOptions(4, 5, 6);
             createTables(globalState, numTables);
             prepareTables(globalState);
         }
@@ -216,10 +212,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     }
 
     /**
-     * Synchronized database creation with safety delays.
-     * YugabyteDB cannot create multiple databases simultaneously due to catalog version conflicts
-     * across the distributed system. This method serializes all database creation operations
-     * with 2-second safety delays before and after to allow catalog changes to propagate.
+     * Synchronized database creation with safety delays. YugabyteDB cannot create multiple databases simultaneously due
+     * to catalog version conflicts across the distributed system. This method serializes all database creation
+     * operations with 2-second safety delays before and after to allow catalog changes to propagate.
      */
     private void createDatabaseSync(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
         synchronized (DATABASE_CREATION_LOCK) {
@@ -264,16 +259,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         if (msg == null) {
             return false;
         }
-        return msg.contains("Catalog Version Mismatch")
-                || msg.contains("Restart read required")
-                || msg.contains("could not serialize access due to concurrent update")
-                || msg.contains("not onlined")
-                || msg.contains("is being accessed by other users")
-                || msg.contains("connection has been closed")
-                || msg.contains("does not exist")
-                || msg.contains("already exists")
-                || msg.contains("Timed out waiting")
-                || msg.contains("Restarting a DDL transaction not supported");
+        return msg.contains("Catalog Version Mismatch") || msg.contains("Restart read required")
+                || msg.contains("could not serialize access due to concurrent update") || msg.contains("not onlined")
+                || msg.contains("is being accessed by other users") || msg.contains("connection has been closed")
+                || msg.contains("does not exist") || msg.contains("already exists") || msg.contains("Timed out waiting")
+                || msg.contains("Restarting a DDL transaction not supported")
+                || msg.contains("insufficient disk space");
     }
 
     private Connection createConnectionSafely(String entryURL, String user, String password) {
@@ -300,22 +291,17 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     protected void readFunctions(YSQLGlobalState globalState) throws SQLException {
         // Commented out to avoid set-returning functions causing errors
         /*
-        SQLQueryAdapter query = new SQLQueryAdapter("SELECT proname, provolatile FROM pg_proc;");
-        SQLancerResultSet rs = query.executeAndGet(globalState);
-        while (rs.next()) {
-            String functionName = rs.getString(1);
-            Character functionType = rs.getString(2).charAt(0);
-            globalState.addFunctionAndType(functionName, functionType);
-        }
-        */
+         * SQLQueryAdapter query = new SQLQueryAdapter("SELECT proname, provolatile FROM pg_proc;"); SQLancerResultSet
+         * rs = query.executeAndGet(globalState); while (rs.next()) { String functionName = rs.getString(1); Character
+         * functionType = rs.getString(2).charAt(0); globalState.addFunctionAndType(functionName, functionType); }
+         */
     }
 
     protected void createTables(YSQLGlobalState globalState, int numTables) throws Exception {
         while (globalState.getSchema().getDatabaseTables().size() < numTables) {
             try {
                 String tableName = DBMSCommon.createTableName(globalState.getSchema().getDatabaseTables().size());
-                SQLQueryAdapter createTable = YSQLTableGenerator.generate(tableName, generateOnlyKnown,
-                        globalState);
+                SQLQueryAdapter createTable = YSQLTableGenerator.generate(tableName, generateOnlyKnown, globalState);
                 globalState.executeStatement(createTable);
             } catch (IgnoreMeException e) {
                 // do nothing
@@ -333,16 +319,15 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 
     protected void prepareTables(YSQLGlobalState globalState) throws Exception {
         // Filter out unsupported actions like MERGE
-        Action[] supportedActions = Arrays.stream(Action.values())
-                .filter(action -> !action.name().equals("MERGE"))
+        Action[] supportedActions = Arrays.stream(Action.values()).filter(action -> !action.name().equals("MERGE"))
                 .toArray(Action[]::new);
-        
+
         StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, supportedActions,
                 YSQLProvider::mapActions, (q) -> {
-            if (globalState.getSchema().getDatabaseTables().isEmpty()) {
-                throw new IgnoreMeException();
-            }
-        });
+                    if (globalState.getSchema().getDatabaseTables().isEmpty()) {
+                        throw new IgnoreMeException();
+                    }
+                });
         se.executeStatements();
         ExpectedErrors errors = new ExpectedErrors();
         YSQLErrors.addTransactionErrors(errors);
@@ -405,11 +390,11 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             ExpectedErrors errors = new ExpectedErrors();
             YSQLErrors.addTransactionErrors(errors);
             if (Randomly.getBoolean()) {
-                query = new SQLQueryAdapter("COMMIT", true);
+                query = new SQLQueryAdapter("COMMIT", errors, true);
             } else if (Randomly.getBoolean()) {
                 query = YSQLTransactionGenerator.executeBegin();
             } else {
-                query = new SQLQueryAdapter("ROLLBACK", true);
+                query = new SQLQueryAdapter("ROLLBACK", errors, true);
             }
             return query;
         }), //
@@ -448,23 +433,21 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             YSQLErrors.addTransactionErrors(errors);
             return new SQLQueryAdapter("RESET ALL", errors);
             /*
-             * https://www.postgres.org/docs/devel/sql-reset.html TODO: also
-             * configuration parameter
+             * https://www.postgres.org/docs/devel/sql-reset.html TODO: also configuration parameter
              */
         }), //
-        //        NOTIFY(YSQLNotifyGenerator::createNotify), //
-//        LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
-//        UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
+        // NOTIFY(YSQLNotifyGenerator::createNotify), //
+        // LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
+        // UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
-        CREATE_VIEW(YSQLViewGenerator::create),
-        REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
+        CREATE_VIEW(YSQLViewGenerator::create), REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
         PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
         ALTER_DATABASE(YSQLAlterDatabaseGenerator::create);
         // YugabyteDB 2025.1 new features
         // Simplified vector testing (full vector support requires vector column type)
-//        VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
-//        VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
-//        VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
+        // VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
+        // VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
+        // VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

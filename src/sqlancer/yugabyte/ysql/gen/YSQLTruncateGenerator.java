@@ -18,19 +18,17 @@ public final class YSQLTruncateGenerator {
 
     public static SQLQueryAdapter create(YSQLGlobalState globalState) {
         // First get only actual tables (not views)
-        List<String> tableNames = globalState.getSchema().getDatabaseTables().stream()
-                .filter(t -> !t.isView())
-                .map(AbstractTable::getName)
-                .collect(Collectors.toList());
-        
+        List<String> tableNames = globalState.getSchema().getDatabaseTables().stream().filter(t -> !t.isView())
+                .map(AbstractTable::getName).collect(Collectors.toList());
+
         // If no tables exist, skip TRUNCATE
         if (tableNames.isEmpty()) {
             throw new IgnoreMeException();
         }
-        
+
         // Get a random non-empty subset of tables
         List<String> selectedTables = Randomly.nonEmptySubset(tableNames);
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("TRUNCATE");
         if (Randomly.getBoolean()) {
@@ -38,10 +36,10 @@ public final class YSQLTruncateGenerator {
         }
         sb.append(" ");
         sb.append(String.join(", ", selectedTables));
-        
+
         // TODO remove Restart read required after proper tx ddls
-        ExpectedErrors errors = ExpectedErrors
-                .from("cannot truncate a table referenced in a foreign key constraint", "is not a table");
+        ExpectedErrors errors = ExpectedErrors.from("cannot truncate a table referenced in a foreign key constraint",
+                "is not a table");
         errors.add("does not exist"); // https://github.com/yugabyte/yugabyte-db/issues/28276
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);

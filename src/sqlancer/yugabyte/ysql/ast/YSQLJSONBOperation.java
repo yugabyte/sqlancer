@@ -41,79 +41,79 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
         CONTAINS("@>") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.JSONB};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.JSONB };
             }
         },
         CONTAINED_BY("<@") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.JSONB};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.JSONB };
             }
         },
-        
+
         // Key existence operators
         KEY_EXISTS("?") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT };
             }
         },
         ANY_KEY_EXISTS("?|") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         },
         ALL_KEYS_EXIST("?&") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         },
-        
+
         // Path operators
         GET_AS_JSON("->") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT };
             }
         },
         GET_AS_TEXT("->>") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT };
             }
         },
         GET_PATH_AS_JSON("#>") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         },
         GET_PATH_AS_TEXT("#>>") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         },
-        
+
         // Deletion operators
         DELETE_KEY("-") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT };
             }
         },
         DELETE_PATH("#-") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         },
         DELETE_KEYS("-") {
             @Override
             public YSQLDataType[] getInputDataTypes() {
-                return new YSQLDataType[]{YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY};
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT_ARRAY };
             }
         };
 
@@ -126,11 +126,11 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
         public static YSQLJSONBOperator getRandom() {
             return Randomly.fromOptions(YSQLJSONBOperator.values());
         }
-        
+
         public static YSQLJSONBOperator getRandomBooleanOperator() {
             return Randomly.fromOptions(CONTAINS, CONTAINED_BY, KEY_EXISTS, ANY_KEY_EXISTS, ALL_KEYS_EXIST);
         }
-        
+
         public static YSQLJSONBOperator getRandomExtractionOperator() {
             return Randomly.fromOptions(GET_AS_JSON, GET_AS_TEXT, GET_PATH_AS_JSON, GET_PATH_AS_TEXT);
         }
@@ -139,7 +139,7 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
         public String getTextRepresentation() {
             return textRepresentation;
         }
-        
+
         public abstract YSQLDataType[] getInputDataTypes();
     }
 }
