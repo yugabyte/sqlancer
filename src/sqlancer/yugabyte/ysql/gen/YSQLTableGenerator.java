@@ -33,13 +33,16 @@ public class YSQLTableGenerator {
         this.generateOnlyKnown = generateOnlyKnown;
         this.globalState = globalState;
         table = new YSQLTable(tableName, columnsToBeAdded, null, null, null, false, false);
-        // YB catalog specific messages
 
-        errors.add("The catalog snapshot used for this transaction has been invalidated");
-        errors.add("Split rows ordering does not match column ordering");
-        errors.add("Timed out waiting for Create Table");
-        errors.add("Table with identifier");
-        errors.add("Failed DDL operation as requested");
+        if (!globalState.isPgCompatible()) {
+            // YB catalog specific messages
+            errors.add("The catalog snapshot used for this transaction has been invalidated");
+            errors.add("Split rows ordering does not match column ordering");
+            errors.add("Timed out waiting for Create Table");
+            errors.add("Table with identifier");
+            errors.add("Failed DDL operation as requested");
+            errors.add("Cannot split table that does not have primary key");
+        }
 
         errors.add("PRIMARY KEY containing column of type");
         errors.add("specified value cannot be cast to type boolean for column");
@@ -59,7 +62,6 @@ public class YSQLTableGenerator {
         errors.add("operator class");
         errors.add("but default expression is of type text");
         errors.add("has pseudo-type unknown");
-        errors.add("Cannot split table that does not have primary key");
         errors.add("inherits from generated column but specifies identity");
         errors.add("inherits from generated column but specifies default");
         YSQLErrors.addCommonExpressionErrors(errors);
@@ -77,8 +79,10 @@ public class YSQLTableGenerator {
 
         if (Randomly.getBooleanWithRatherLowProbability()) {
             sb.append(" UNLOGGED");
-            errors.add("UNLOGGED keyword is ignored");
-            errors.add("WARNING: UNLOGGED keyword is ignored");
+            if (!globalState.isPgCompatible()) {
+                errors.add("UNLOGGED keyword is ignored");
+                errors.add("WARNING: UNLOGGED keyword is ignored");
+            }
         } else if (Randomly.getBooleanWithSmallProbability()) {
             sb.append(" ");
             isTemporaryTable = true;

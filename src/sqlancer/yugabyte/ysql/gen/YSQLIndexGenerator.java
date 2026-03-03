@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,7 +44,13 @@ public final class YSQLIndexGenerator {
         IndexType method;
         if (Randomly.getBoolean()) {
             sb.append(" USING ");
-            method = Randomly.fromOptions(IndexType.values());
+            if (globalState.isPgCompatible()) {
+                IndexType[] pgTypes = Arrays.stream(IndexType.values())
+                        .filter(t -> t != IndexType.LSM && t != IndexType.HASH).toArray(IndexType[]::new);
+                method = Randomly.fromOptions(pgTypes);
+            } else {
+                method = Randomly.fromOptions(IndexType.values());
+            }
             sb.append(method);
         } else {
             method = IndexType.BTREE;

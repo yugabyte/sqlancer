@@ -12,7 +12,11 @@ import sqlancer.OracleFactory;
 import sqlancer.common.oracle.CompositeTestOracle;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
-import sqlancer.yugabyte.ysql.oracle.*;
+import sqlancer.yugabyte.ysql.oracle.YSQLBlockedDDL;
+import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
+import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
+import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
+import sqlancer.yugabyte.ysql.oracle.YSQLPivotedQuerySynthesisOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPAggregateOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPHavingOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPWhereOracle;
@@ -22,6 +26,7 @@ import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPWhereOracle;
 public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 5433;
+    public static final int DEFAULT_PG_PORT = 5432;
 
     @Parameter(names = "--bulk-insert", description = "Specifies whether INSERT statements should be issued in bulk", arity = 1)
     public boolean allowBulkInsert;

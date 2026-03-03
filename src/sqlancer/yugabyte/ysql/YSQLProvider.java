@@ -1,24 +1,48 @@
 package sqlancer.yugabyte.ysql;
 
-import com.google.auto.service.AutoService;
-import sqlancer.*;
-import sqlancer.common.DBMSCommon;
-import sqlancer.common.query.SQLQueryAdapter;
-import sqlancer.common.query.SQLQueryProvider;
-// import sqlancer.common.query.SQLancerResultSet;
-import sqlancer.common.query.ExpectedErrors;
-import sqlancer.yugabyte.ysql.gen.*;
-// import sqlancer.yugabyte.ysql.gen.YSQLMergeGenerator; // Commented out - MERGE not supported
+import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
-import java.util.Arrays;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 
-import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
+import com.google.auto.service.AutoService;
+
+import sqlancer.AbstractAction;
+import sqlancer.DatabaseProvider;
+import sqlancer.IgnoreMeException;
+import sqlancer.MainOptions;
+import sqlancer.Randomly;
+import sqlancer.SQLConnection;
+import sqlancer.SQLProviderAdapter;
+import sqlancer.StatementExecutor;
+import sqlancer.common.DBMSCommon;
+import sqlancer.common.query.ExpectedErrors;
+import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.common.query.SQLQueryProvider;
+import sqlancer.yugabyte.ysql.gen.YSQLAlterDatabaseGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLAlterTableGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLCommentGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDeleteGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDiscardGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDropIndexGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
+import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTransactionGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTruncateGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLUpdateGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLVacuumGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLViewGenerator;
 
 @AutoService(DatabaseProvider.class)
 public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOptions> {
@@ -59,6 +83,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     public static int mapActions(YSQLGlobalState globalState, Action a) {
         Randomly r = globalState.getRandomly();
         boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
+        boolean isPgCompat = globalState.isPgCompatible();
         int nrPerformed;
         switch (a) {
         case CREATE_INDEX:
@@ -75,7 +100,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             nrPerformed = r.getInteger(0, 2);
             break;
         case PARALLEL_QUERY_TEST:
-            nrPerformed = r.getInteger(0, 1);
+            nrPerformed = isPgCompat ? 0 : r.getInteger(0, 1);
             break;
         case ALTER_DATABASE:
             nrPerformed = r.getInteger(0, 3);
@@ -145,11 +170,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
 
     @Override
     public SQLConnection createDatabase(YSQLGlobalState globalState) throws SQLException {
+        boolean isPgCompat = globalState.isPgCompatible();
         username = globalState.getOptions().getUserName();
         password = globalState.getOptions().getPassword();
         host = globalState.getOptions().getHost();
         port = globalState.getOptions().getPort();
-        entryPath = "/yugabyte";
+        entryPath = isPgCompat ? "/postgres" : "/yugabyte";
         entryURL = globalState.getDbmsSpecificOptions().connectionURL;
         String entryDatabaseName = entryPath.substring(1);
         databaseName = globalState.getDatabaseName();
@@ -158,8 +184,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             host = YSQLOptions.DEFAULT_HOST;
         }
         if (port == MainOptions.NO_SET_PORT) {
-            port = YSQLOptions.DEFAULT_PORT;
+            port = isPgCompat ? YSQLOptions.DEFAULT_PG_PORT : YSQLOptions.DEFAULT_PORT;
         }
+
+        String jdbcScheme = isPgCompat ? "jdbc:postgresql" : "jdbc:yugabytedb";
 
         try {
             URI uri = new URI(entryURL);
@@ -189,13 +217,14 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             if (port == MainOptions.NO_SET_PORT) {
                 port = uri.getPort();
             }
-            entryURL = String.format("jdbc:yugabytedb://%s:%d/%s", host, port, entryDatabaseName);
+            entryURL = String.format("%s://%s:%d/%s", jdbcScheme, host, port, entryDatabaseName);
         } catch (URISyntaxException e) {
             throw new AssertionError(e);
         }
 
-        if (globalState.getDbmsSpecificOptions().createDatabases)
+        if (globalState.getDbmsSpecificOptions().createDatabases) {
             createDatabaseSync(globalState, entryDatabaseName);
+        }
 
         int databaseIndex = entryURL.indexOf("/" + entryDatabaseName) + 1;
         String preDatabaseName = entryURL.substring(0, databaseIndex);
@@ -211,12 +240,30 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         return "ysql";
     }
 
-    /**
-     * Synchronized database creation with safety delays. YugabyteDB cannot create multiple databases simultaneously due
-     * to catalog version conflicts across the distributed system. This method serializes all database creation
-     * operations with 2-second safety delays before and after to allow catalog changes to propagate.
-     */
     private void createDatabaseSync(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
+        if (globalState.isPgCompatible()) {
+            createDatabaseSimple(globalState, entryDatabaseName);
+        } else {
+            createDatabaseWithLock(globalState, entryDatabaseName);
+        }
+    }
+
+    private void createDatabaseSimple(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
+        try (Connection con = createConnectionSafely(entryURL, username, password)) {
+            globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
+            globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
+            createDatabaseCommand = getCreateDatabaseCommand(globalState);
+            globalState.getState().logStatement(createDatabaseCommand);
+            try (Statement s = con.createStatement()) {
+                s.execute("DROP DATABASE IF EXISTS " + databaseName);
+            }
+            try (Statement s = con.createStatement()) {
+                s.execute(createDatabaseCommand);
+            }
+        }
+    }
+
+    private void createDatabaseWithLock(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
         synchronized (DATABASE_CREATION_LOCK) {
             // Safety delay before - allow any previous DDL to propagate across the cluster
             exceptionLessSleep(SAFETY_DELAY_MS);
@@ -251,9 +298,6 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         }
     }
 
-    /**
-     * Check if the exception is a retryable error during database creation.
-     */
     private boolean isRetryableDatabaseCreationError(Exception e) {
         String msg = e.getMessage();
         if (msg == null) {
@@ -338,7 +382,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     private String getCreateDatabaseCommand(YSQLGlobalState state) {
         StringBuilder sb = new StringBuilder();
         sb.append("CREATE DATABASE ").append(databaseName).append(" ");
-        if (CATALOG.equals(state.getDbmsSpecificOptions().oracle.get(0))) {
+        boolean isPgCompat = state.getDbmsSpecificOptions().pgCompatibility;
+        if (!isPgCompat && CATALOG.equals(state.getDbmsSpecificOptions().oracle.get(0))) {
             // Always colocate for CATALOG tests - many tables benefit from colocation
             sb.append("WITH COLOCATION = true ");
 
@@ -365,8 +410,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                     sb.append("' ");
                 }
 
-                // create non colocated database with low priority to avoid cluster resource issues
-                if (Randomly.getPercentage() > 0.05 && state.getDbmsSpecificOptions().pgCompatibility) {
+                // create colocated database with low priority, skip entirely in PG compatibility mode
+                if (!isPgCompat && Randomly.getPercentage() > 0.05) {
                     sb.append("COLOCATION = true ");
                 }
 

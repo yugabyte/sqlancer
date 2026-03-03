@@ -124,4 +124,8 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
         this.allowedFunctionTypes = types;
     }
 
+    public boolean isPgCompatible() {
+        return getDbmsSpecificOptions().pgCompatibility;
+    }
+
 }

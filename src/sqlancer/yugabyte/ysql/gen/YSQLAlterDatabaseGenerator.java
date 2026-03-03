@@ -1,5 +1,7 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.Arrays;
+
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
@@ -86,6 +88,17 @@ public final class YSQLAlterDatabaseGenerator {
             this.name = name;
             this.values = values;
         }
+
+        public boolean isYbSpecific() {
+            return name.startsWith("yb_") || name.startsWith("ysql_");
+        }
+
+        public String[] getValues(boolean pgCompat) {
+            if (pgCompat && this == DEFAULT_TABLE_ACCESS_METHOD) {
+                return new String[] { "'heap'" };
+            }
+            return values;
+        }
     }
 
     public static SQLQueryAdapter create(YSQLGlobalState globalState) {
@@ -111,7 +124,11 @@ public final class YSQLAlterDatabaseGenerator {
         errors.add("is not accessible");
         YSQLErrors.addTransactionErrors(errors);
 
-        GUCParameter param = Randomly.fromOptions(GUCParameter.values());
+        boolean pgCompat = globalState.isPgCompatible();
+        GUCParameter[] candidates = pgCompat
+                ? Arrays.stream(GUCParameter.values()).filter(p -> !p.isYbSpecific()).toArray(GUCParameter[]::new)
+                : GUCParameter.values();
+        GUCParameter param = Randomly.fromOptions(candidates);
 
         if (Randomly.getBoolean()) {
             sb.append(" SET ");
@@ -120,7 +137,7 @@ public final class YSQLAlterDatabaseGenerator {
                 sb.append(" TO DEFAULT");
             } else {
                 sb.append(" TO ");
-                sb.append(Randomly.fromOptions(param.values));
+                sb.append(Randomly.fromOptions(param.getValues(pgCompat)));
             }
         } else {
             if (Randomly.getBoolean()) {

@@ -221,6 +221,12 @@ public final class YSQLCommon {
 
     public static void generateWith(StringBuilder sb, YSQLGlobalState globalState, ExpectedErrors errors,
             List<YSQLColumn> columnsToBeAdded, boolean isTemporaryTable) {
+        if (globalState.isPgCompatible()) {
+            if (Randomly.getBoolean()) {
+                sb.append(" WITHOUT OIDS ");
+            }
+            return;
+        }
         if (Randomly.getBoolean()) {
             if (Randomly.getBoolean()) {
                 sb.append(" WITHOUT OIDS ");

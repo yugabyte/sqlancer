@@ -19,6 +19,9 @@ public final class YSQLSetGenerator {
         StringBuilder sb = new StringBuilder();
         ArrayList<ConfigurationOption> options = new ArrayList<>(Arrays.asList(ConfigurationOption.values()));
         options.remove(ConfigurationOption.DEFAULT_WITH_OIDS);
+        if (globalState.isPgCompatible()) {
+            options.removeIf(ConfigurationOption::isYbSpecific);
+        }
         ConfigurationOption option = Randomly.fromList(options);
         sb.append("SET ");
         if (Randomly.getBoolean()) {
@@ -30,7 +33,7 @@ public final class YSQLSetGenerator {
         if (Randomly.getBoolean()) {
             sb.append("DEFAULT");
         } else {
-            sb.append(option.op.apply(globalState.getRandomly()));
+            sb.append(option.getValue(globalState.getRandomly(), globalState.isPgCompatible()));
         }
         // todo avoiding props that are not represented in YSQL
         ExpectedErrors errors = new ExpectedErrors();
@@ -147,7 +150,20 @@ public final class YSQLSetGenerator {
         CURSOR_TUPLE_FRACTION("cursor_tuple_fraction", (r) -> Randomly.fromOptions(0.0, 0.1, 0.5, 1.0)),
         GIN_FUZZY_SEARCH_LIMIT("gin_fuzzy_search_limit", (r) -> Randomly.fromOptions(0, 100, 1000)),
         XMLOPTION("xmloption", (r) -> Randomly.fromOptions("'content'", "'document'")),
-        DEFAULT_TABLE_ACCESS_METHOD("default_table_access_method", (r) -> Randomly.fromOptions("'heap'", "'ybheap'")),
+        DEFAULT_TABLE_ACCESS_METHOD("default_table_access_method", (r) -> Randomly.fromOptions("'heap'", "'ybheap'")) {
+            @Override
+            public boolean isYbSpecific() {
+                return false;
+            }
+
+            @Override
+            public Object getValue(Randomly r, boolean pgCompat) {
+                if (pgCompat) {
+                    return "'heap'";
+                }
+                return op.apply(r);
+            }
+        },
         DEFAULT_TABLESPACE("default_tablespace", (r) -> Randomly.fromOptions("''", "'pg_default'")),
         // Locale Variants
         LC_MONETARY("lc_monetary", (r) -> Randomly.fromOptions("'C'", "'en_US.UTF-8'")),
@@ -244,7 +260,7 @@ public final class YSQLSetGenerator {
         GEQO_SEED("geqo_seed", (r) -> Randomly.fromOptions(0, 0.5, 1));
 
         private final String optionName;
-        private final Function<Randomly, Object> op;
+        final Function<Randomly, Object> op;
 
         ConfigurationOption(String optionName, Function<Randomly, Object> op) {
             this.optionName = optionName;
@@ -253,6 +269,14 @@ public final class YSQLSetGenerator {
 
         public String getOptionName() {
             return optionName;
+        }
+
+        public boolean isYbSpecific() {
+            return optionName.startsWith("yb_") || optionName.startsWith("ysql_");
+        }
+
+        public Object getValue(Randomly r, boolean pgCompat) {
+            return op.apply(r);
         }
     }
 

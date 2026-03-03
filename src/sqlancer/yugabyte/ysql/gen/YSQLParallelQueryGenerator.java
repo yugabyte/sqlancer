@@ -1,7 +1,7 @@
 package sqlancer.yugabyte.ysql.gen;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
@@ -9,8 +9,8 @@ import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLancerResultSet;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
-import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
+import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 
 public final class YSQLParallelQueryGenerator {
 
@@ -39,7 +39,9 @@ public final class YSQLParallelQueryGenerator {
         settings.add("SET force_parallel_mode = " + Randomly.fromOptions("'off'", "'on'", "'regress'"));
 
         // Add YugabyteDB-specific parallel settings
-        settings.add("SET yb_parallel_range_rows = " + Randomly.getNotCachedInteger(1, 10000));
+        if (!globalState.isPgCompatible()) {
+            settings.add("SET yb_parallel_range_rows = " + Randomly.getNotCachedInteger(1, 10000));
+        }
         settings.add("SET enable_parallel_append = " + Randomly.fromOptions("true", "false"));
         settings.add("SET enable_parallel_hash = " + Randomly.fromOptions("true", "false"));
 
@@ -88,6 +90,9 @@ public final class YSQLParallelQueryGenerator {
     }
 
     private static boolean checkIfColocated(YSQLGlobalState globalState) {
+        if (globalState.isPgCompatible()) {
+            return false;
+        }
         try {
             SQLQueryAdapter query = new SQLQueryAdapter("SELECT yb_is_database_colocated()", true);
             SQLancerResultSet rs = query.executeAndGet(globalState);
