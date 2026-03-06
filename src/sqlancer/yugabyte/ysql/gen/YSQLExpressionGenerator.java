@@ -17,6 +17,7 @@ import sqlancer.yugabyte.ysql.YSQLProvider;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLRowValue;
+import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation;
@@ -29,16 +30,24 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConcatOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLFunctionWithUnknownResult;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
+import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLSelect;
+import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
+import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
@@ -370,6 +379,14 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             validOptions.remove(BooleanExpression.SIMILAR_TO);
             validOptions.remove(BooleanExpression.POSIX_REGEX);
             validOptions.remove(BooleanExpression.BINARY_RANGE_COMPARISON);
+            validOptions.remove(BooleanExpression.EXISTS_SUBQUERY);
+            validOptions.remove(BooleanExpression.IN_SUBQUERY);
+            validOptions.remove(BooleanExpression.QUANTIFIED_COMPARISON);
+        }
+        if (globalState == null || globalState.getSchema() == null) {
+            validOptions.remove(BooleanExpression.EXISTS_SUBQUERY);
+            validOptions.remove(BooleanExpression.IN_SUBQUERY);
+            validOptions.remove(BooleanExpression.QUANTIFIED_COMPARISON);
         }
         BooleanExpression option = Randomly.fromList(validOptions);
         switch (option) {
@@ -419,6 +436,12 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                     generateExpression(depth + 1, YSQLDataType.RANGE));
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.BOOLEAN);
+        case EXISTS_SUBQUERY:
+            return new YSQLExistsSubquery(createSubquerySelect(1, null), Randomly.getBoolean());
+        case IN_SUBQUERY:
+            return generateInSubquery(depth);
+        case QUANTIFIED_COMPARISON:
+            return generateQuantifiedComparison(depth);
         default:
             throw new AssertionError();
         }
@@ -480,6 +503,19 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             rightExpr.add(generateExpression(depth + 1, type));
         }
         return new YSQLInOperation(leftExpr, rightExpr, Randomly.getBoolean());
+    }
+
+    private YSQLExpression generateInSubquery(int depth) {
+        YSQLDataType inType = getComparisonSafeType();
+        return new YSQLInSubquery(generateExpression(depth + 1, inType), createSubquerySelect(1, inType),
+                Randomly.getBoolean());
+    }
+
+    private YSQLExpression generateQuantifiedComparison(int depth) {
+        YSQLDataType qType = getComparisonSafeType();
+        return new YSQLQuantifiedComparison(generateExpression(depth + 1, qType), createSubquerySelect(1, qType),
+                YSQLQuantifiedComparison.ComparisonOperator.getRandom(),
+                YSQLQuantifiedComparison.QuantifierType.getRandom());
     }
 
     private YSQLExpression generateCaseExpression(int depth, YSQLDataType resultType) {
@@ -739,7 +775,10 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         YSQLExpression left = generateExpression(depth + 1, inputTypes[0]);
         YSQLExpression right;
 
-        if (inputTypes[1] == YSQLDataType.TEXT_ARRAY) {
+        if (op == YSQLJSONBOperation.YSQLJSONBOperator.JSONPATH_MATCH) {
+            right = YSQLConstant.createTextConstant(Randomly.fromOptions("$.key > 1", "$.x == 0", "$.arr[*] > 0",
+                    "$.nested.x > 1", "$.key", "$[0] > 0"));
+        } else if (inputTypes[1] == YSQLDataType.TEXT_ARRAY) {
             // Generate text array constant
             List<String> keys = new ArrayList<>();
             int numKeys = Randomly.smallNumber() + 1;
@@ -825,6 +864,31 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                 Randomly.fromOptions("$.key", "$.key1.key2", "$[0]", "$.array[*]", "$.key ? (@ > 5)", "$.**"));
     }
 
+    private YSQLSelect createSubquerySelect(int nrColumns, YSQLDataType targetType) {
+        YSQLTables subTables = globalState.getSchema().getRandomTableNonEmptyTables();
+        YSQLExpressionGenerator subGen = new YSQLExpressionGenerator(globalState).setColumns(subTables.getColumns());
+        List<YSQLExpression> fetchColumns = new ArrayList<>();
+        for (int i = 0; i < nrColumns; i++) {
+            if (targetType != null) {
+                fetchColumns.add(subGen.generateExpression(0, targetType));
+            } else {
+                fetchColumns.add(subGen.generateExpression(0));
+            }
+        }
+        YSQLSelect select = new YSQLSelect();
+        select.setSelectType(SelectType.ALL);
+        select.setFromList(subTables.getTables().stream().map(t -> new YSQLFromTable(t, Randomly.getBoolean()))
+                .collect(Collectors.toList()));
+        select.setFetchColumns(fetchColumns);
+        if (Randomly.getBoolean()) {
+            select.setWhereClause(subGen.generateExpression(0, YSQLDataType.BOOLEAN));
+        }
+        if (Randomly.getBoolean()) {
+            select.setLimitClause(YSQLConstant.createIntConstant(Randomly.getPositiveOrZeroNonCachedInteger()));
+        }
+        return select;
+    }
+
     private YSQLExpression generateBitExpression(int depth) {
         BitExpression option;
         option = Randomly.fromOptions(BitExpression.values());
@@ -849,8 +913,14 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     private YSQLExpression generateIntExpression(int depth) {
-        IntExpression option;
-        option = Randomly.fromOptions(IntExpression.values());
+        List<IntExpression> validOptions = new ArrayList<>(Arrays.asList(IntExpression.values()));
+        if (globalState.isPgCompatible()) {
+            validOptions.remove(IntExpression.YB_HASH_CODE);
+        }
+        if (YSQLProvider.generateOnlyKnown || globalState == null || globalState.getSchema() == null) {
+            validOptions.remove(IntExpression.SCALAR_SUBQUERY);
+        }
+        IntExpression option = Randomly.fromList(validOptions);
         switch (option) {
         case CAST:
             return new YSQLCastOperation(generateExpression(depth + 1), getCompoundDataType(YSQLDataType.INT));
@@ -866,6 +936,10 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                     YSQLBinaryArithmeticOperation.YSQLBinaryOperator.getRandom());
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.INT);
+        case YB_HASH_CODE:
+            return new YSQLFunction("yb_hash_code", YSQLDataType.INT, generateExpression(depth + 1));
+        case SCALAR_SUBQUERY:
+            return new YSQLScalarSubquery(createSubquerySelect(1, YSQLDataType.INT), YSQLDataType.INT);
         default:
             throw new AssertionError();
         }
@@ -925,10 +999,32 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     private YSQLExpression getAggregate(YSQLDataType dataType) {
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            return generateOrderedSetAggregate();
+        }
         List<YSQLAggregate.YSQLAggregateFunction> aggregates = YSQLAggregate.YSQLAggregateFunction
                 .getAggregates(dataType);
         YSQLAggregate.YSQLAggregateFunction agg = Randomly.fromList(aggregates);
         return generateArgsForAggregate(dataType, agg);
+    }
+
+    private YSQLExpression generateOrderedSetAggregate() {
+        YSQLOrderedSetAggregate.OrderedSetFunction func = YSQLOrderedSetAggregate.OrderedSetFunction.getRandom();
+        List<YSQLExpression> directArgs = new ArrayList<>();
+        List<YSQLExpression> orderByArgs = new ArrayList<>();
+        switch (func) {
+        case MODE:
+            orderByArgs.add(generateExpression(0));
+            break;
+        case PERCENTILE_CONT:
+        case PERCENTILE_DISC:
+            directArgs.add(YSQLConstant.createFloatConstant((float) (r.getDouble())));
+            orderByArgs.add(generateExpression(0, YSQLDataType.INT));
+            break;
+        default:
+            throw new AssertionError(func);
+        }
+        return new YSQLOrderedSetAggregate(func, directArgs, orderByArgs);
     }
 
     public YSQLAggregate generateArgsForAggregate(YSQLDataType dataType, YSQLAggregate.YSQLAggregateFunction agg) {
@@ -937,7 +1033,11 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         for (YSQLDataType argType : types) {
             args.add(generateExpression(argType));
         }
-        return new YSQLAggregate(args, agg);
+        YSQLAggregate aggregate = new YSQLAggregate(args, agg);
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            aggregate.setFilterClause(generateExpression(0, YSQLDataType.BOOLEAN));
+        }
+        return aggregate;
     }
 
     public YSQLExpressionGenerator allowAggregates(boolean value) {
@@ -1033,7 +1133,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
-        SIMILAR_TO, POSIX_REGEX, BINARY_RANGE_COMPARISON, CASE_EXPRESSION
+        SIMILAR_TO, POSIX_REGEX, BINARY_RANGE_COMPARISON, CASE_EXPRESSION, EXISTS_SUBQUERY, IN_SUBQUERY,
+        QUANTIFIED_COMPARISON
     }
 
     private enum RangeExpression {
@@ -1049,7 +1150,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     private enum IntExpression {
-        UNARY_OPERATION, FUNCTION, CAST, BINARY_ARITHMETIC_EXPRESSION, CASE_EXPRESSION
+        UNARY_OPERATION, FUNCTION, CAST, BINARY_ARITHMETIC_EXPRESSION, CASE_EXPRESSION, YB_HASH_CODE, SCALAR_SUBQUERY
     }
 
 }

@@ -66,6 +66,16 @@ public class YSQLNoRECOracle extends NoRECBase<YSQLGlobalState> implements TestO
             YSQLJoin j = new YSQLJoin(subquery, joinClause, options);
             joinStatements.add(j);
         }
+        // LATERAL JOIN subqueries (~15% chance)
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            YSQLTables lateralTables = globalState.getSchema().getRandomTableNonEmptyTables();
+            YSQLSelect.YSQLSubquery lateralSubquery = YSQLTLPBase.createSubquery(globalState, "lat0", lateralTables);
+            YSQLJoin.YSQLJoinType lateralType = Randomly.getBoolean() ? YSQLJoin.YSQLJoinType.LATERAL_CROSS
+                    : YSQLJoin.YSQLJoinType.LATERAL_LEFT;
+            YSQLExpression lateralOnClause = lateralType == YSQLJoin.YSQLJoinType.LATERAL_CROSS ? null
+                    : gen.generateExpression(YSQLDataType.BOOLEAN);
+            joinStatements.add(new YSQLJoin(lateralSubquery, lateralOnClause, lateralType));
+        }
         return joinStatements;
     }
 

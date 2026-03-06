@@ -35,6 +35,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
 import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
@@ -143,6 +144,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             break;
         case INSERT:
             nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+            break;
+        case SAVEPOINT:
+            nrPerformed = r.getInteger(0, 3);
             break;
         // YugabyteDB 2025.1 new features
         // case VECTOR_SYNTAX_TEST:
@@ -487,7 +491,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create), REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
         PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
-        ALTER_DATABASE(YSQLAlterDatabaseGenerator::create);
+        ALTER_DATABASE(YSQLAlterDatabaseGenerator::create), SAVEPOINT(YSQLSavepointGenerator::generate);
         // YugabyteDB 2025.1 new features
         // Simplified vector testing (full vector support requires vector column type)
         // VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),

@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,18 +15,25 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin.YSQLJoinType;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
+import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
@@ -133,12 +141,18 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             case CROSS:
                 sb.append("CROSS JOIN");
                 break;
+            case LATERAL_CROSS:
+                sb.append("CROSS JOIN LATERAL");
+                break;
+            case LATERAL_LEFT:
+                sb.append("LEFT OUTER JOIN LATERAL");
+                break;
             default:
                 throw new AssertionError(j.getType());
             }
             sb.append(" ");
             visit(j.getTableReference());
-            if (j.getType() != YSQLJoinType.CROSS) {
+            if (j.getType() != YSQLJoinType.CROSS && j.getType() != YSQLJoinType.LATERAL_CROSS) {
                 sb.append(" ON ");
                 visit(j.getOnClause());
             }
@@ -249,6 +263,11 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         sb.append("(");
         visit(op.getArgs());
         sb.append(")");
+        if (op.getFilterClause() != null) {
+            sb.append(" FILTER (WHERE ");
+            visit(op.getFilterClause());
+            sb.append(")");
+        }
     }
 
     @Override
@@ -426,6 +445,116 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         }
         sb.append(" AS (");
         visit(cte.getQuery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLExistsSubquery op) {
+        if (op.isNegated()) {
+            sb.append("NOT ");
+        }
+        sb.append("EXISTS (");
+        visit(op.getSubquery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLInSubquery op) {
+        sb.append("(");
+        visit(op.getExpression());
+        sb.append(")");
+        if (op.isNegated()) {
+            sb.append(" NOT");
+        }
+        sb.append(" IN (");
+        visit(op.getSubquery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLQuantifiedComparison op) {
+        sb.append("(");
+        visit(op.getExpression());
+        sb.append(") ");
+        sb.append(op.getOperator().getTextRepresentation());
+        sb.append(" ");
+        sb.append(op.getQuantifier().name());
+        sb.append(" (");
+        visit(op.getSubquery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLScalarSubquery op) {
+        sb.append("(");
+        visit(op.getSubquery());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLGroupingSets op) {
+        switch (op.getGroupingSetType()) {
+        case GROUPING_SETS:
+            sb.append("GROUPING SETS (");
+            for (int i = 0; i < op.getSets().size(); i++) {
+                if (i != 0) {
+                    sb.append(", ");
+                }
+                sb.append("(");
+                visit(op.getSets().get(i));
+                sb.append(")");
+            }
+            sb.append(")");
+            break;
+        case ROLLUP:
+            sb.append("ROLLUP(");
+            visit(flattenSets(op.getSets()));
+            sb.append(")");
+            break;
+        case CUBE:
+            sb.append("CUBE(");
+            visit(flattenSets(op.getSets()));
+            sb.append(")");
+            break;
+        default:
+            throw new AssertionError(op.getGroupingSetType());
+        }
+    }
+
+    private List<YSQLExpression> flattenSets(List<List<YSQLExpression>> sets) {
+        List<YSQLExpression> result = new ArrayList<>();
+        for (List<YSQLExpression> set : sets) {
+            result.addAll(set);
+        }
+        return result;
+    }
+
+    @Override
+    public void visit(YSQLGroupingFunction op) {
+        sb.append("GROUPING(");
+        visit(op.getGroupingExpression());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLOrderedSetAggregate op) {
+        sb.append(op.getFunction().name().toLowerCase());
+        sb.append("(");
+        List<YSQLExpression> directArgs = op.getDirectArgs();
+        for (int i = 0; i < directArgs.size(); i++) {
+            if (i != 0) {
+                sb.append(", ");
+            }
+            visit(directArgs.get(i));
+        }
+        sb.append(") WITHIN GROUP (ORDER BY ");
+        List<YSQLExpression> orderByArgs = op.getOrderByArgs();
+        for (int i = 0; i < orderByArgs.size(); i++) {
+            if (i != 0) {
+                sb.append(", ");
+            }
+            visit(orderByArgs.get(i));
+        }
         sb.append(")");
     }
 

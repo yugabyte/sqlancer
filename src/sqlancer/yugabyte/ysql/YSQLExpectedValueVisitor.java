@@ -8,16 +8,23 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
+import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
@@ -206,6 +213,50 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
         print(op);
         visit(op.getLeft());
         visit(op.getRight());
+    }
+
+    @Override
+    public void visit(YSQLExistsSubquery op) {
+        print(op);
+    }
+
+    @Override
+    public void visit(YSQLInSubquery op) {
+        print(op);
+        visit(op.getExpression());
+    }
+
+    @Override
+    public void visit(YSQLQuantifiedComparison op) {
+        print(op);
+        visit(op.getExpression());
+    }
+
+    @Override
+    public void visit(YSQLScalarSubquery op) {
+        print(op);
+    }
+
+    @Override
+    public void visit(YSQLGroupingSets op) {
+        print(op);
+    }
+
+    @Override
+    public void visit(YSQLGroupingFunction op) {
+        print(op);
+        visit(op.getGroupingExpression());
+    }
+
+    @Override
+    public void visit(YSQLOrderedSetAggregate op) {
+        print(op);
+        for (YSQLExpression arg : op.getDirectArgs()) {
+            visit(arg);
+        }
+        for (YSQLExpression arg : op.getOrderByArgs()) {
+            visit(arg);
+        }
     }
 
     public String get() {

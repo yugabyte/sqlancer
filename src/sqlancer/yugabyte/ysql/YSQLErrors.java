@@ -46,6 +46,7 @@ public final class YSQLErrors {
         errors.add("set-returning functions are not allowed in expressions");
 
         errors.add("canceling statement due to statement timeout");
+        errors.add("LATERAL reference to table");
     }
 
     public static void addCommonTableErrors(ExpectedErrors errors) {
@@ -237,12 +238,17 @@ public final class YSQLErrors {
         errors.add("cannot deconstruct a scalar");
         errors.add("aggregate function calls cannot contain set-returning function calls");
         errors.add("single boolean result is expected");
+        errors.add("TABLESAMPLE clause is not yet supported");
+        errors.add("EXCLUDE constraint not supported yet");
+        errors.add("could not find jsonpath variable");
+        errors.add("syntax error at end of jsonpath input");
 
         addToCharFunctionErrors(errors);
         addBitStringOperationErrors(errors);
         addFunctionErrors(errors);
         addCommonRangeExpressionErrors(errors);
         addCommonRegexExpressionErrors(errors);
+        addYbginErrors(errors);
     }
 
     public static void addToCharFunctionErrors(ExpectedErrors errors) {
@@ -278,6 +284,7 @@ public final class YSQLErrors {
         errors.add("encoding conversion from UTF8 to ASCII not supported"); // to_ascii
         errors.add("negative substring length not allowed"); // substr
         errors.add("invalid mask length"); // set_masklen
+        errors.add("function yb_hash_code"); // yb_hash_code
     }
 
     public static void addCommonRegexExpressionErrors(ExpectedErrors errors) {
@@ -303,6 +310,7 @@ public final class YSQLErrors {
         errors.add("must appear in the GROUP BY clause or be used in an aggregate function");
         errors.add("is not in select list");
         errors.add("aggregate functions are not allowed in GROUP BY");
+        errors.add("FILTER specified, but");
     }
 
     public static void addWindowFunctionErrors(ExpectedErrors errors) {
@@ -358,5 +366,33 @@ public final class YSQLErrors {
         errors.add("is not a view");
         errors.add("non-integer constant in DISTINCT ON");
         errors.add("SELECT DISTINCT ON expressions must match initial ORDER BY expressions");
+    }
+
+    public static void addYbginErrors(ExpectedErrors errors) {
+        errors.add("unsupported ybgin index scan");
+        errors.add("ybgin index method cannot use more than one required scan entry");
+        errors.add("index method does not support");
+    }
+
+    public static void addSubqueryErrors(ExpectedErrors errors) {
+        errors.add("more than one row returned by a subquery used as an expression");
+        errors.add("subquery must return only one column");
+        errors.add("subquery has too many columns");
+    }
+
+    public static void addGroupingSetsErrors(ExpectedErrors errors) {
+        errors.add("GROUPING function is not allowed here");
+        errors.add("arguments to GROUPING must be grouping expressions");
+    }
+
+    public static void addOrderedSetAggregateErrors(ExpectedErrors errors) {
+        errors.add("WITHIN GROUP is required");
+        errors.add("function requires WITHIN GROUP");
+        errors.add("percentile value");
+    }
+
+    public static void addSavepointErrors(ExpectedErrors errors) {
+        errors.add("SAVEPOINT can only be used in transaction blocks");
+        errors.add("no such savepoint");
     }
 }

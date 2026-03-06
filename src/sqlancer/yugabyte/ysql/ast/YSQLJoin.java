@@ -38,7 +38,7 @@ public class YSQLJoin implements YSQLExpression {
     }
 
     public enum YSQLJoinType {
-        INNER, LEFT, RIGHT, FULL, CROSS;
+        INNER, LEFT, RIGHT, FULL, CROSS, LATERAL_CROSS, LATERAL_LEFT;
 
         public static YSQLJoinType getRandom() {
             return Randomly.fromOptions(values());

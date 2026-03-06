@@ -11,6 +11,8 @@ import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.ForClause;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
@@ -56,7 +58,28 @@ public final class YSQLRandomQueryGenerator {
             select.setWhereClause(gen.generateExpression(0, YSQLDataType.BOOLEAN));
         }
         if (Randomly.getBooleanWithRatherLowProbability()) {
-            select.setGroupByExpressions(gen.generateExpressions(Randomly.smallNumber() + 1));
+            if (Randomly.getBooleanWithRatherLowProbability()) {
+                // Use GROUPING SETS / ROLLUP / CUBE
+                List<YSQLExpression> groupByExprs = gen.generateExpressions(Randomly.smallNumber() + 1);
+                YSQLGroupingSets.GroupingSetType gsType = YSQLGroupingSets.GroupingSetType.getRandom();
+                List<List<YSQLExpression>> sets = new ArrayList<>();
+                for (YSQLExpression expr : groupByExprs) {
+                    List<YSQLExpression> set = new ArrayList<>();
+                    set.add(expr);
+                    sets.add(set);
+                }
+                if (gsType == YSQLGroupingSets.GroupingSetType.GROUPING_SETS && Randomly.getBoolean()) {
+                    sets.add(new ArrayList<>());
+                }
+                List<YSQLExpression> groupBy = new ArrayList<>();
+                groupBy.add(new YSQLGroupingSets(gsType, sets));
+                select.setGroupByExpressions(groupBy);
+                if (Randomly.getBoolean()) {
+                    columns.add(new YSQLGroupingFunction(groupByExprs.get(0)));
+                }
+            } else {
+                select.setGroupByExpressions(gen.generateExpressions(Randomly.smallNumber() + 1));
+            }
             if (Randomly.getBoolean()) {
                 select.setHavingClause(gen.generateHavingClause());
             }

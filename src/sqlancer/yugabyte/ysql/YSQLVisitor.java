@@ -12,16 +12,23 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
+import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
+import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
@@ -97,6 +104,20 @@ public interface YSQLVisitor {
 
     void visit(YSQLSetOperation op);
 
+    void visit(YSQLExistsSubquery op);
+
+    void visit(YSQLInSubquery op);
+
+    void visit(YSQLQuantifiedComparison op);
+
+    void visit(YSQLScalarSubquery op);
+
+    void visit(YSQLGroupingSets op);
+
+    void visit(YSQLGroupingFunction op);
+
+    void visit(YSQLOrderedSetAggregate op);
+
     default void visit(YSQLExpression expression) {
         if (expression instanceof YSQLConstant) {
             visit((YSQLConstant) expression);
@@ -142,6 +163,20 @@ public interface YSQLVisitor {
             visit((YSQLCte) expression);
         } else if (expression instanceof YSQLSetOperation) {
             visit((YSQLSetOperation) expression);
+        } else if (expression instanceof YSQLExistsSubquery) {
+            visit((YSQLExistsSubquery) expression);
+        } else if (expression instanceof YSQLInSubquery) {
+            visit((YSQLInSubquery) expression);
+        } else if (expression instanceof YSQLQuantifiedComparison) {
+            visit((YSQLQuantifiedComparison) expression);
+        } else if (expression instanceof YSQLScalarSubquery) {
+            visit((YSQLScalarSubquery) expression);
+        } else if (expression instanceof YSQLGroupingSets) {
+            visit((YSQLGroupingSets) expression);
+        } else if (expression instanceof YSQLGroupingFunction) {
+            visit((YSQLGroupingFunction) expression);
+        } else if (expression instanceof YSQLOrderedSetAggregate) {
+            visit((YSQLOrderedSetAggregate) expression);
         } else {
             throw new AssertionError(expression);
         }

@@ -22,6 +22,12 @@ public class YSQLFunction implements YSQLExpression {
         this.args = args.clone();
     }
 
+    public YSQLFunction(String funcName, YSQLDataType returnType, YSQLExpression... args) {
+        this.func = funcName;
+        this.returnType = returnType;
+        this.args = args.clone();
+    }
+
     public String getFunctionName() {
         return func;
     }

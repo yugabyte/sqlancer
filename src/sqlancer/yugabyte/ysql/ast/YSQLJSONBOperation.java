@@ -21,6 +21,7 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
         case KEY_EXISTS:
         case ANY_KEY_EXISTS:
         case ALL_KEYS_EXIST:
+        case JSONPATH_MATCH:
             return YSQLDataType.BOOLEAN;
         case GET_AS_TEXT:
         case GET_PATH_AS_TEXT:
@@ -97,6 +98,14 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
             }
         },
 
+        // JSONPath match operator
+        JSONPATH_MATCH("@@") {
+            @Override
+            public YSQLDataType[] getInputDataTypes() {
+                return new YSQLDataType[] { YSQLDataType.JSONB, YSQLDataType.TEXT };
+            }
+        },
+
         // Deletion operators
         DELETE_KEY("-") {
             @Override
@@ -128,7 +137,8 @@ public class YSQLJSONBOperation extends BinaryOperatorNode<YSQLExpression, YSQLJ
         }
 
         public static YSQLJSONBOperator getRandomBooleanOperator() {
-            return Randomly.fromOptions(CONTAINS, CONTAINED_BY, KEY_EXISTS, ANY_KEY_EXISTS, ALL_KEYS_EXIST);
+            return Randomly.fromOptions(CONTAINS, CONTAINED_BY, KEY_EXISTS, ANY_KEY_EXISTS, ALL_KEYS_EXIST,
+                    JSONPATH_MATCH);
         }
 
         public static YSQLJSONBOperator getRandomExtractionOperator() {

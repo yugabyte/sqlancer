@@ -15,8 +15,18 @@ import sqlancer.yugabyte.ysql.ast.YSQLAggregate.YSQLAggregateFunction;
  */
 public class YSQLAggregate extends FunctionNode<YSQLAggregateFunction, YSQLExpression> implements YSQLExpression {
 
+    private YSQLExpression filterClause;
+
     public YSQLAggregate(List<YSQLExpression> args, YSQLAggregateFunction func) {
         super(func, args);
+    }
+
+    public YSQLExpression getFilterClause() {
+        return filterClause;
+    }
+
+    public void setFilterClause(YSQLExpression filterClause) {
+        this.filterClause = filterClause;
     }
 
     public enum YSQLAggregateFunction {
