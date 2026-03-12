@@ -96,6 +96,8 @@ public final class YSQLErrors {
         errors.add("cannot be changed");
         errors.add("cannot split table that does not have primary key");
         errors.add("exceed the safe system maximum");
+        errors.add("cannot use subquery in check constraint");
+        errors.add("cannot use subquery in DEFAULT expression");
     }
 
     public static void addTransactionErrors(ExpectedErrors errors) {
@@ -285,6 +287,8 @@ public final class YSQLErrors {
         errors.add("negative substring length not allowed"); // substr
         errors.add("invalid mask length"); // set_masklen
         errors.add("function yb_hash_code"); // yb_hash_code
+        errors.add("undefined datatype given to yb_hash_code");
+        errors.add("unsupported datatype given to yb_hash_code");
     }
 
     public static void addCommonRegexExpressionErrors(ExpectedErrors errors) {
