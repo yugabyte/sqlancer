@@ -20,6 +20,8 @@ public class YSQLTLPHavingOracle extends YSQLTLPBase {
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addGroupingErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
+        YSQLErrors.addOrderedSetAggregateErrors(errors);
     }
 
     @Override

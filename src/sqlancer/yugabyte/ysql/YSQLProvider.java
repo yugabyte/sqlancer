@@ -380,7 +380,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         ExpectedErrors errors = new ExpectedErrors();
         YSQLErrors.addTransactionErrors(errors);
         globalState.executeStatement(new SQLQueryAdapter("COMMIT", errors, true));
-        globalState.executeStatement(new SQLQueryAdapter("SET SESSION statement_timeout = 15000;\n"));
+        ExpectedErrors setErrors = new ExpectedErrors();
+        YSQLErrors.addKnownIssues(setErrors);
+        globalState.executeStatement(new SQLQueryAdapter("SET SESSION statement_timeout = 15000;\n", setErrors));
     }
 
     private String getCreateDatabaseCommand(YSQLGlobalState state) {

@@ -98,6 +98,7 @@ public final class YSQLErrors {
         errors.add("exceed the safe system maximum");
         errors.add("cannot use subquery in check constraint");
         errors.add("cannot use subquery in DEFAULT expression");
+        errors.add("cannot use subquery in partition key expression");
     }
 
     public static void addTransactionErrors(ExpectedErrors errors) {
@@ -398,5 +399,6 @@ public final class YSQLErrors {
     public static void addSavepointErrors(ExpectedErrors errors) {
         errors.add("SAVEPOINT can only be used in transaction blocks");
         errors.add("no such savepoint");
+        errors.add("does not exist");
     }
 }
