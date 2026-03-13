@@ -1,0 +1,44 @@
+name: Release SQLancer 2.0.0-yb
+
+on:
+  push:
+    branches:
+      - master-yb
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          check-latest: true
+
+      - name: Build with Maven
+        run: mvn package -DskipTests --file pom.xml
+
+      - name: Package release artifact
+        run: |
+          cd target
+          mv -n sqlancer-2.0.0.jar sqlancer-2.0.0-yb.jar
+          tar -czf sqlancer.tar.gz sqlancer-2.0.0-yb.jar lib/
+
+      - name: Delete existing release and tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete sqlancer_2.0.0-yb --yes --cleanup-tag || true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create sqlancer_2.0.0-yb \
+            target/sqlancer.tar.gz#sqlancer-2.0.0-yb.tar.gz \
+            --title "SQLancer 2.0.0-yb" \
+            --notes "Auto-built from master-yb branch (commit ${{ github.sha }})" \
+            --latest=false
