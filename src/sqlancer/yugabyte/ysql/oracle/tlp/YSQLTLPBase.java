@@ -38,6 +38,7 @@ public class YSQLTLPBase extends TernaryLogicPartitioningOracleBase<YSQLExpressi
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
     }
 
     public static YSQLSelect.YSQLSubquery createSubquery(YSQLGlobalState globalState, String name, YSQLTables tables) {
