@@ -140,6 +140,7 @@ public final class YSQLIndexGenerator {
         errors.add("result of range difference would not be contiguous");
         errors.add("which is part of the partition key");
         errors.add("cannot use subquery in index predicate");
+        errors.add("cannot use subquery in index expression");
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);

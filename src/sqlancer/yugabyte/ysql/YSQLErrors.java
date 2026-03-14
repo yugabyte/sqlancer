@@ -99,6 +99,7 @@ public final class YSQLErrors {
         errors.add("cannot use subquery in check constraint");
         errors.add("cannot use subquery in DEFAULT expression");
         errors.add("cannot use subquery in partition key expression");
+        errors.add("cannot use subquery in column generation expression");
     }
 
     public static void addTransactionErrors(ExpectedErrors errors) {
@@ -128,6 +129,8 @@ public final class YSQLErrors {
         errors.add("Deadlock");
         errors.add("deadlock");
         errors.add("Statement timeout while waiting for lock");
+        // Savepoint + DDL interaction
+        errors.add("interleaving SAVEPOINT & DDL in transaction disallowed");
         // Timeout errors
         errors.add("canceling statement due to statement timeout");
         errors.add("canceling statement due to lock timeout");
