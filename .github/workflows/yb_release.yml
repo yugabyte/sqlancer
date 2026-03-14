@@ -25,7 +25,7 @@ jobs:
         run: |
           cd target
           mv -n sqlancer-2.0.0.jar sqlancer-2.0.0-yb.jar
-          tar -czf sqlancer.tar.gz sqlancer-2.0.0-yb.jar lib/
+          tar -czf sqlancer-2.0.0-yb.tar.gz sqlancer-2.0.0-yb.jar lib/
 
       - name: Delete existing release and tag
         env:
@@ -38,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create sqlancer_2.0.0-yb \
-            target/sqlancer.tar.gz#sqlancer-2.0.0-yb.tar.gz \
+            target/sqlancer-2.0.0-yb.tar.gz \
             --title "SQLancer 2.0.0-yb" \
             --notes "Auto-built from master-yb branch (commit ${{ github.sha }})" \
             --latest=false
