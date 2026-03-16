@@ -27,6 +27,7 @@ public final class YSQLInsertGenerator {
         YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
         errors.add("cannot insert into column");
         errors.add("violates not-null constraint");
         errors.add("does not support Infinity yet");
