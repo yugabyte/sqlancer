@@ -143,6 +143,7 @@ public final class YSQLIndexGenerator {
         errors.add("cannot use subquery in index expression");
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 

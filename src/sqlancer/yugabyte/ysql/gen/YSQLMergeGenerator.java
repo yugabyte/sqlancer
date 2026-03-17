@@ -201,6 +201,8 @@ public final class YSQLMergeGenerator {
 
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonInsertUpdateErrors(errors);
+        YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
 
         return new SQLQueryAdapter(sb.toString(), errors);
     }

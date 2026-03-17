@@ -20,6 +20,7 @@ public final class YSQLErrors {
         errors.add("marked for deletion");
         errors.add("hit the limit");
         errors.add("insufficient disk space");
+        errors.add("NullTest indexqual has wrong key");
     }
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {

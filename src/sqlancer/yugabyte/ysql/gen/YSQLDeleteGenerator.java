@@ -38,6 +38,7 @@ public final class YSQLDeleteGenerator {
         }
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
         errors.add("out of range");
         errors.add("cannot cast");
         errors.add("invalid input syntax for");

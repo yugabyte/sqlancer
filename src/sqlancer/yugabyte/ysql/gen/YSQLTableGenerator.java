@@ -67,6 +67,7 @@ public class YSQLTableGenerator {
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
     }
 
     public static SQLQueryAdapter generate(String tableName, boolean generateOnlyKnown, YSQLGlobalState globalState) {
