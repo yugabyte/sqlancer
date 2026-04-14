@@ -28,19 +28,33 @@ import sqlancer.yugabyte.ysql.gen.YSQLAlterDatabaseGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCommentGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLCopyGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLCursorGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDeleteGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDiscardGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDoBlockGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDomainGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDropIndexGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLExplainGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLFunctionGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLGrantRevokeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLLockTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
+import sqlancer.yugabyte.ysql.gen.YSQLNotifyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLPolicyGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLPreparedStatementGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLRuleGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTransactionGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTriggerGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTruncateGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTypeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLUpdateGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLVacuumGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLViewGenerator;
@@ -121,18 +135,15 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case SET_CONSTRAINTS:
         case SET:
         case COMMENT_ON:
-            // case NOTIFY:
-            // case LISTEN:
-            // case UNLISTEN:
+        case NOTIFY:
+        case LISTEN:
+        case UNLISTEN:
         case TRUNCATE:
             nrPerformed = r.getInteger(0, 15);
             break;
         case CREATE_SEQUENCE:
             nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 15);
             break;
-        // case MERGE:
-        // nrPerformed = r.getInteger(0, 10);
-        // break;
         case CREATE_VIEW:
             nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 5);
             break;
@@ -148,12 +159,40 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case SAVEPOINT:
             nrPerformed = r.getInteger(0, 3);
             break;
-        // YugabyteDB 2025.1 new features
-        // case VECTOR_SYNTAX_TEST:
-        // case VECTOR_INDEX_SYNTAX:
-        // case VECTOR_SETTINGS:
-        // nrPerformed = r.getInteger(0, 2); // Less frequent as these will mostly error
-        // break;
+        // New consistency-focused generators
+        case PREPARED_STATEMENT:
+        case CURSOR:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case CREATE_DOMAIN:
+        case CREATE_TYPE:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case LOCK_TABLE:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case EXPLAIN:
+            nrPerformed = r.getInteger(0, 3);
+            break;
+        case CREATE_FUNCTION:
+        case CREATE_TRIGGER:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case COPY_TO:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case CREATE_POLICY:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case DO_BLOCK:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case CREATE_RULE:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case GRANT_REVOKE:
+            nrPerformed = r.getInteger(0, 2);
+            break;
         default:
             throw new AssertionError(a);
         }
@@ -366,11 +405,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     }
 
     protected void prepareTables(YSQLGlobalState globalState) throws Exception {
-        // Filter out unsupported actions like MERGE
-        Action[] supportedActions = Arrays.stream(Action.values()).filter(action -> !action.name().equals("MERGE"))
-                .toArray(Action[]::new);
-
-        StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, supportedActions,
+        StatementExecutor<YSQLGlobalState, Action> se = new StatementExecutor<>(globalState, Action.values(),
                 YSQLProvider::mapActions, (q) -> {
                     if (globalState.getSchema().getDatabaseTables().isEmpty()) {
                         throw new IgnoreMeException();
@@ -457,7 +492,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         UPDATE(YSQLUpdateGenerator::create), //
         TRUNCATE(YSQLTruncateGenerator::create), //
         VACUUM(YSQLVacuumGenerator::create), //
-        SET(YSQLSetGenerator::create), // TODO insert yugabyte sets
+        SET(YSQLSetGenerator::create), //
         SET_CONSTRAINTS((g) -> {
             String sb = "SET CONSTRAINTS ALL " + Randomly.fromOptions("DEFERRED", "IMMEDIATE");
             ExpectedErrors errors = new ExpectedErrors();
@@ -483,22 +518,30 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             errors.add("RESET ALL cannot run inside a transaction block");
             YSQLErrors.addTransactionErrors(errors);
             return new SQLQueryAdapter("RESET ALL", errors);
-            /*
-             * https://www.postgres.org/docs/devel/sql-reset.html TODO: also configuration parameter
-             */
         }), //
-        // NOTIFY(YSQLNotifyGenerator::createNotify), //
-        // LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
-        // UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
+        NOTIFY(YSQLNotifyGenerator::createNotify), //
+        LISTEN((g) -> YSQLNotifyGenerator.createListen()), //
+        UNLISTEN((g) -> YSQLNotifyGenerator.createUnlisten()), //
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
-        CREATE_VIEW(YSQLViewGenerator::create), REFRESH_VIEW(YSQLMaterializedViewRefresh::create),
-        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest),
-        ALTER_DATABASE(YSQLAlterDatabaseGenerator::create), SAVEPOINT(YSQLSavepointGenerator::generate);
-        // YugabyteDB 2025.1 new features
-        // Simplified vector testing (full vector support requires vector column type)
-        // VECTOR_SYNTAX_TEST(YSQLSimpleVectorGenerator::testVectorSyntax),
-        // VECTOR_INDEX_SYNTAX(YSQLSimpleVectorGenerator::testVectorIndexSyntax),
-        // VECTOR_SETTINGS(YSQLSimpleVectorGenerator::testVectorSettings);
+        CREATE_VIEW(YSQLViewGenerator::create), //
+        REFRESH_VIEW(YSQLMaterializedViewRefresh::create), //
+        PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest), //
+        ALTER_DATABASE(YSQLAlterDatabaseGenerator::create), //
+        SAVEPOINT(YSQLSavepointGenerator::generate), //
+        // New consistency-focused generators
+        PREPARED_STATEMENT(YSQLPreparedStatementGenerator::generate), //
+        CURSOR(YSQLCursorGenerator::generate), //
+        CREATE_DOMAIN(YSQLDomainGenerator::generate), //
+        CREATE_TYPE(YSQLTypeGenerator::generate), //
+        LOCK_TABLE(YSQLLockTableGenerator::generate), //
+        EXPLAIN(YSQLExplainGenerator::generate), //
+        CREATE_FUNCTION(YSQLFunctionGenerator::generate), //
+        CREATE_TRIGGER(YSQLTriggerGenerator::generate), //
+        COPY_TO(YSQLCopyGenerator::generate), //
+        CREATE_POLICY(YSQLPolicyGenerator::generate), //
+        DO_BLOCK(YSQLDoBlockGenerator::generate), //
+        CREATE_RULE(YSQLRuleGenerator::generate), //
+        GRANT_REVOKE(YSQLGrantRevokeGenerator::generate);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

@@ -1,7 +1,9 @@
 package sqlancer.yugabyte.ysql.gen;
 
 import sqlancer.Randomly;
+import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 
 public final class YSQLNotifyGenerator {
@@ -14,6 +16,8 @@ public final class YSQLNotifyGenerator {
     }
 
     public static SQLQueryAdapter createNotify(YSQLGlobalState globalState) {
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addTransactionErrors(errors);
         StringBuilder sb = new StringBuilder();
         sb.append("NOTIFY ");
         sb.append(getChannel());
@@ -23,15 +27,19 @@ public final class YSQLNotifyGenerator {
             sb.append(globalState.getRandomly().getString().replace("'", "''"));
             sb.append("'");
         }
-        return new SQLQueryAdapter(sb.toString());
+        return new SQLQueryAdapter(sb.toString(), errors);
     }
 
     public static SQLQueryAdapter createListen() {
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addTransactionErrors(errors);
         String sb = "LISTEN " + getChannel();
-        return new SQLQueryAdapter(sb);
+        return new SQLQueryAdapter(sb, errors);
     }
 
     public static SQLQueryAdapter createUnlisten() {
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addTransactionErrors(errors);
         StringBuilder sb = new StringBuilder();
         sb.append("UNLISTEN ");
         if (Randomly.getBoolean()) {
@@ -39,7 +47,7 @@ public final class YSQLNotifyGenerator {
         } else {
             sb.append("*");
         }
-        return new SQLQueryAdapter(sb.toString());
+        return new SQLQueryAdapter(sb.toString(), errors);
     }
 
 }

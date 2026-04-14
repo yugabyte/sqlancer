@@ -37,6 +37,7 @@ public final class YSQLDeleteGenerator {
                     YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, table.getColumns())));
         }
         YSQLErrors.addCommonExpressionErrors(errors);
+        YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addSubqueryErrors(errors);
         errors.add("out of range");

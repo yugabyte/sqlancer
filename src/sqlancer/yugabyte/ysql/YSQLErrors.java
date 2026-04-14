@@ -312,6 +312,10 @@ public final class YSQLErrors {
     public static void addCommonInsertUpdateErrors(ExpectedErrors errors) {
         errors.add("value too long for type character");
         errors.add("not found in view targetlist");
+        errors.add("cannot perform INSERT RETURNING");
+        errors.add("cannot perform UPDATE RETURNING");
+        errors.add("cannot perform DELETE RETURNING");
+        errors.add("You need an unconditional ON");
     }
 
     public static void addGroupingErrors(ExpectedErrors errors) {
@@ -404,5 +408,70 @@ public final class YSQLErrors {
         errors.add("SAVEPOINT can only be used in transaction blocks");
         errors.add("no such savepoint");
         errors.add("does not exist");
+    }
+
+    public static void addCursorErrors(ExpectedErrors errors) {
+        errors.add("DECLARE CURSOR can only be used in transaction blocks");
+        errors.add("cursor can only scan forward");
+        errors.add("already in use");
+        errors.add("is not open");
+        errors.add("no such cursor");
+        errors.add("portal");
+        errors.add("no result set");
+    }
+
+    public static void addPreparedStatementErrors(ExpectedErrors errors) {
+        errors.add("prepared statement");
+        errors.add("wrong number of parameters");
+        errors.add("could not determine data type of parameter");
+        errors.add("there is no parameter");
+    }
+
+    public static void addDomainErrors(ExpectedErrors errors) {
+        errors.add("is not a domain");
+        errors.add("column \"value\" not found");
+        errors.add("violates check constraint");
+    }
+
+    public static void addTypeErrors(ExpectedErrors errors) {
+        errors.add("is not a composite type");
+        errors.add("cannot be made a member of itself");
+    }
+
+    public static void addTriggerErrors(ExpectedErrors errors) {
+        errors.add("Triggers are not yet supported");
+        errors.add("Triggers are not supported yet");
+        errors.add("trigger function");
+        errors.add("must be declared as a function");
+        errors.add("function does not return");
+        errors.add("cannot create trigger");
+    }
+
+    public static void addUserFunctionErrors(ExpectedErrors errors) {
+        errors.add("cannot change return type");
+        errors.add("cannot change name of input parameter");
+        errors.add("is not a function");
+        errors.add("could not find a function");
+        errors.add("function result type must be");
+        errors.add("return type mismatch");
+        errors.add("cannot determine result data type");
+    }
+
+    public static void addPolicyErrors(ExpectedErrors errors) {
+        errors.add("row-level security");
+        errors.add("row level security");
+        errors.add("new row violates row-level security");
+    }
+
+    public static void addRuleErrors(ExpectedErrors errors) {
+        errors.add("rules on SELECT");
+        errors.add("cannot have RETURNING");
+        errors.add("is not a view");
+    }
+
+    public static void addLockErrors(ExpectedErrors errors) {
+        errors.add("LOCK TABLE can only be used in transaction blocks");
+        errors.add("cannot be locked");
+        errors.add("deadlock detected");
     }
 }
