@@ -138,6 +138,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case NOTIFY:
         case LISTEN:
         case UNLISTEN:
+            nrPerformed = 0; // LISTEN/NOTIFY disabled (requires ysql_yb_enable_listen_notify flag)
+            break;
         case TRUNCATE:
             nrPerformed = r.getInteger(0, 15);
             break;
