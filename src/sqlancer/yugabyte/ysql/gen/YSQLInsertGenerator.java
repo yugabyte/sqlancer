@@ -50,6 +50,7 @@ public final class YSQLInsertGenerator {
         errors.add("invalid input syntax");
         errors.add("division by zero");
         errors.add("data type unknown");
+        errors.add("INSERT with ON CONFLICT clause cannot be used with table that has INSERT or UPDATE rules");
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO ");
         sb.append(table.getName());

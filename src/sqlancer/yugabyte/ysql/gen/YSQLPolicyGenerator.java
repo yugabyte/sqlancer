@@ -29,6 +29,7 @@ public final class YSQLPolicyGenerator {
         errors.add("row-level security");
         errors.add("row level security");
         errors.add("new row violates row-level security");
+        errors.add("only WITH CHECK expression allowed for INSERT");
         errors.add("This statement not supported yet");
 
         switch (Randomly.fromOptions(0, 1, 2, 3)) {

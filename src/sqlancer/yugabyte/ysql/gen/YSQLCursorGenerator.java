@@ -24,6 +24,7 @@ public final class YSQLCursorGenerator {
         YSQLErrors.addCommonExpressionErrors(errors);
         errors.add("does not exist");
         errors.add("already in use");
+        errors.add("already exists");
         errors.add("is not open");
         errors.add("no such cursor");
         errors.add("cursor can only scan forward");
