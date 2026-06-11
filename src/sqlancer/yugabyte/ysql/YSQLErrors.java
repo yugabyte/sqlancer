@@ -139,7 +139,8 @@ public final class YSQLErrors {
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
         errors.add("invalid line specification");
-        errors.add("could not convert type bytea to");
+        // covers "CASE/WHEN could not convert type", "GREATEST/LEAST could not convert type", etc.
+        errors.add("could not convert type");
         errors.add("Unterminated string literal started at position");
         errors.add("non-integer constant in");
         errors.add("must appear in the GROUP BY clause or be used in an aggregate function");
