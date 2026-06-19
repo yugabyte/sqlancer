@@ -44,6 +44,12 @@ public class YSQLJoin implements YSQLExpression {
             return Randomly.fromOptions(values());
         }
 
+        // LATERAL is only valid before a subquery/function, not a plain table reference. Use this when joining a bare
+        // table so we never render invalid "CROSS JOIN LATERAL <table>".
+        public static YSQLJoinType getRandomNonLateral() {
+            return Randomly.fromOptions(INNER, LEFT, RIGHT, FULL, CROSS);
+        }
+
     }
 
 }

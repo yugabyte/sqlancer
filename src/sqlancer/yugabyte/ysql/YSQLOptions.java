@@ -17,6 +17,7 @@ import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
 import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
 import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLPivotedQuerySynthesisOracle;
+import sqlancer.yugabyte.ysql.oracle.YSQLScanGUCOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPAggregateOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPHavingOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPWhereOracle;
@@ -103,6 +104,12 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
                 oracles.add(new YSQLTLPHavingOracle(globalState));
                 oracles.add(new YSQLTLPAggregateOracle(globalState));
                 return new CompositeTestOracle<YSQLGlobalState>(oracles, globalState);
+            }
+        },
+        SCAN_GUC {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLScanGUCOracle(globalState);
             }
         }
 

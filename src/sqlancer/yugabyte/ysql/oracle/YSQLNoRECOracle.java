@@ -53,7 +53,9 @@ public class YSQLNoRECOracle extends NoRECBase<YSQLGlobalState> implements TestO
             YSQLExpression joinClause = gen.generateExpression(YSQLDataType.BOOLEAN);
             YSQLTable table = Randomly.fromList(tables);
             tables.remove(table);
-            YSQLJoin.YSQLJoinType options = YSQLJoin.YSQLJoinType.getRandom();
+            // A plain table reference cannot follow LATERAL, so restrict to non-LATERAL join types here. LATERAL
+            // joins are added separately below against subqueries, where they are valid.
+            YSQLJoin.YSQLJoinType options = YSQLJoin.YSQLJoinType.getRandomNonLateral();
             YSQLJoin j = new YSQLJoin(new YSQLSelect.YSQLFromTable(table, Randomly.getBoolean()), joinClause, options);
             joinStatements.add(j);
         }

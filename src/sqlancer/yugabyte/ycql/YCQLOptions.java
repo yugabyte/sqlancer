@@ -13,6 +13,7 @@ import sqlancer.common.oracle.TestOracle;
 import sqlancer.yugabyte.ycql.YCQLOptions.YCQLOracleFactory;
 import sqlancer.yugabyte.ycql.YCQLProvider.YCQLGlobalState;
 import sqlancer.yugabyte.ycql.test.YCQLFuzzer;
+import sqlancer.yugabyte.ycql.test.YCQLTLPWhereOracle;
 
 @Parameters(separators = "=", commandDescription = "YCQL (default port: " + YCQLOptions.DEFAULT_PORT
         + ", default host: " + YCQLOptions.DEFAULT_HOST)
@@ -39,6 +40,13 @@ public class YCQLOptions implements DBMSSpecificOptions<YCQLOracleFactory> {
             @Override
             public TestOracle<YCQLGlobalState> create(YCQLGlobalState globalState) throws SQLException {
                 return new YCQLFuzzer(globalState);
+            }
+
+        },
+        TLP_WHERE {
+            @Override
+            public TestOracle<YCQLGlobalState> create(YCQLGlobalState globalState) throws SQLException {
+                return new YCQLTLPWhereOracle(globalState);
             }
 
         }

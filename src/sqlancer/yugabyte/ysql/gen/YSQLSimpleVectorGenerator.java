@@ -7,18 +7,14 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 
-/**
- * Simplified vector operations generator that works with existing schema Tests vector syntax without requiring full
- * vector column support
- */
+// Simplified vector (pgvector) operations generator that works with the existing schema. Exercises vector literal,
+// distance-operator, cast, index, and GUC syntax without requiring a dedicated vector column type.
 public final class YSQLSimpleVectorGenerator {
 
     private YSQLSimpleVectorGenerator() {
     }
 
-    /**
-     * Test vector syntax and operations with mock data
-     */
+    // Exercises vector literal / distance / cast syntax with mock vector data.
     public static SQLQueryAdapter testVectorSyntax(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder();
 
@@ -39,7 +35,9 @@ public final class YSQLSimpleVectorGenerator {
             String v1 = generateVectorLiteral();
             String v2 = generateVectorLiteral();
             String op = Randomly.fromOptions("<->", "<#>", "<=>");
-            sb.append(v1).append(" ").append(op).append(" ").append(v2);
+            // Cast both operands to vector so the distance operator resolves; two untyped literals make it ambiguous
+            // ("operator is not unique: unknown <-> unknown") because pgvector defines several vector types.
+            sb.append(v1).append("::vector ").append(op).append(" ").append(v2).append("::vector");
             sb.append(" AS distance");
             break;
 
@@ -59,11 +57,15 @@ public final class YSQLSimpleVectorGenerator {
             sb.append(generateVectorLiteral());
             sb.append(" IS NOT NULL");
             break;
+        default:
+            break;
         }
 
         ExpectedErrors errors = new ExpectedErrors();
         errors.add("type \"vector\" does not exist");
         errors.add("operator does not exist");
+        errors.add("operator is not unique");
+        errors.add("Could not choose a best candidate operator");
         errors.add("cannot cast");
         errors.add("invalid input syntax for type vector");
         errors.add("malformed vector literal");
@@ -77,9 +79,7 @@ public final class YSQLSimpleVectorGenerator {
         return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 
-    /**
-     * Test creating indexes with vector-like syntax (will fail but tests error handling)
-     */
+    // Exercises CREATE INDEX with vector index methods (hnsw/ybhnsw/ivfflat), operator classes, and HNSW parameters.
     public static SQLQueryAdapter testVectorIndexSyntax(YSQLGlobalState globalState) {
         YSQLTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
 
@@ -119,9 +119,12 @@ public final class YSQLSimpleVectorGenerator {
         }
 
         ExpectedErrors errors = new ExpectedErrors();
-        errors.add("access method .* does not exist");
-        errors.add("operator class .* does not exist");
-        errors.add("data type .* has no default operator class");
+        // ExpectedErrors matches by substring, not regex - use literal fragments. On builds without pgvector the
+        // access method / operator class simply does not exist, which must be treated as expected.
+        errors.add("access method");
+        errors.add("operator class");
+        errors.add("does not exist");
+        errors.add("has no default operator class");
         errors.add("cannot create index on dimensionless vector column");
         errors.add("vector indexes do not support");
         errors.add("extension");
@@ -132,9 +135,7 @@ public final class YSQLSimpleVectorGenerator {
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 
-    /**
-     * Test setting vector search parameters
-     */
+    // Exercises SET of vector search parameters (hnsw.ef_search / ivfflat.probes).
     public static SQLQueryAdapter testVectorSettings(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
 
@@ -150,7 +151,8 @@ public final class YSQLSimpleVectorGenerator {
 
         ExpectedErrors errors = new ExpectedErrors();
         errors.add("unrecognized configuration parameter");
-        errors.add("parameter .* cannot be set");
+        errors.add("cannot be set");
+        errors.add("invalid value for parameter");
         YSQLErrors.addTransactionErrors(errors);
 
         return new SQLQueryAdapter(sb.toString(), errors);
@@ -160,8 +162,9 @@ public final class YSQLSimpleVectorGenerator {
         int dimensions = Randomly.fromOptions(2, 3, 4, 8);
         StringBuilder sb = new StringBuilder("'[");
         for (int i = 0; i < dimensions; i++) {
-            if (i > 0)
+            if (i > 0) {
                 sb.append(",");
+            }
             sb.append(Randomly.getUncachedDouble());
         }
         sb.append("]'");
@@ -181,8 +184,9 @@ public final class YSQLSimpleVectorGenerator {
         int dimensions = Randomly.fromOptions(2, 3, 4);
         StringBuilder sb = new StringBuilder("ARRAY[");
         for (int i = 0; i < dimensions; i++) {
-            if (i > 0)
+            if (i > 0) {
                 sb.append(",");
+            }
             sb.append(Randomly.getUncachedDouble());
         }
         sb.append("]");

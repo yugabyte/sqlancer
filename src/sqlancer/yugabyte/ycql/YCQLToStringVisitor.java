@@ -53,6 +53,9 @@ public class YCQLToStringVisitor extends NewToStringVisitor<YCQLExpression> {
             sb.append(" OFFSET ");
             visit(select.getOffsetClause());
         }
+        if (select.isAllowFiltering()) {
+            sb.append(" ALLOW FILTERING");
+        }
     }
 
     public static String asString(Node<YCQLExpression> expr) {

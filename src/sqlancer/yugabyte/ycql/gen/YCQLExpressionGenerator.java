@@ -1,6 +1,7 @@
 package sqlancer.yugabyte.ycql.gen;
 
 import static sqlancer.yugabyte.YugabyteBugs.bug14330;
+import static sqlancer.yugabyte.YugabyteBugs.bugYcqlLogicalInValueContext;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,12 +31,60 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
 
     private final YCQLGlobalState globalState;
 
+    // When true, do not emit logical AND/OR operators - they are only legal in condition contexts (WHERE/IF) and
+    // crash the tserver when evaluated as values (see YugabyteBugs#bugYcqlLogicalInValueContext).
+    private boolean valueContext;
+
     public YCQLExpressionGenerator(YCQLGlobalState globalState) {
         this.globalState = globalState;
     }
 
     private enum Expression {
         BINARY_COMPARISON, BINARY_LOGICAL, BINARY_ARITHMETIC, FUNC, BETWEEN, IN
+    }
+
+    // Generates an expression for a value context (SELECT projection, ORDER BY), where logical operators are
+    // illegal / crash-inducing. Restores the previous mode afterwards.
+    public Node<YCQLExpression> generateValueExpression() {
+        boolean previous = valueContext;
+        valueContext = bugYcqlLogicalInValueContext;
+        try {
+            return generateExpression(0);
+        } finally {
+            valueContext = previous;
+        }
+    }
+
+    public List<Node<YCQLExpression>> generateValueOrderBys() {
+        boolean previous = valueContext;
+        valueContext = bugYcqlLogicalInValueContext;
+        try {
+            return generateOrderBys();
+        } finally {
+            valueContext = previous;
+        }
+    }
+
+    // Generates a boolean condition suitable for a WHERE clause: one or more comparisons combined with AND/OR.
+    // Comparison operands are produced in value context so no logical operator lands in a value position.
+    public Node<YCQLExpression> generatePredicate() {
+        Node<YCQLExpression> condition = generateComparison();
+        while (Randomly.getBooleanWithRatherLowProbability()) {
+            condition = new NewBinaryOperatorNode<YCQLExpression>(condition, generateComparison(),
+                    YCQLBinaryLogicalOperator.getRandom());
+        }
+        return condition;
+    }
+
+    private Node<YCQLExpression> generateComparison() {
+        boolean previous = valueContext;
+        valueContext = bugYcqlLogicalInValueContext;
+        try {
+            return new NewBinaryOperatorNode<YCQLExpression>(generateExpression(0), generateExpression(0),
+                    YCQLBinaryComparisonOperator.getRandom());
+        } finally {
+            valueContext = previous;
+        }
     }
 
     @Override
@@ -49,6 +98,9 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
             return new NewFunctionNode<>(generateExpressions(depth + 1, aggregate.getNrArgs()), aggregate);
         }
         List<Expression> possibleOptions = new ArrayList<>(Arrays.asList(Expression.values()));
+        if (valueContext) {
+            possibleOptions.remove(Expression.BINARY_LOGICAL);
+        }
         Expression expr = Randomly.fromList(possibleOptions);
         switch (expr) {
         case BINARY_COMPARISON:
@@ -91,7 +143,10 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
 
             return YCQLConstant.createNullConstant();
         }
-        YCQLDataType type = YCQLDataType.getRandom();
+        return generateConstantForType(YCQLDataType.getRandom());
+    }
+
+    public Node<YCQLExpression> generateConstantForType(YCQLDataType type) {
         switch (type) {
         case INT:
             return YCQLConstant.createIntConstant(globalState.getRandomly().getInteger());

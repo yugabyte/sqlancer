@@ -3,6 +3,7 @@ package sqlancer.yugabyte.ycql.gen;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import sqlancer.Randomly;
 import sqlancer.common.gen.AbstractInsertGenerator;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
@@ -37,11 +38,39 @@ public class YCQLInsertGenerator extends AbstractInsertGenerator<YCQLColumn> {
         sb.append(" VALUES ");
         insertColumns(columns);
 
+        // IF NOT EXISTS and USING TIMESTAMP are mutually exclusive in CQL, so pick at most one path.
+        if (Randomly.getBoolean()) {
+            sb.append(" IF NOT EXISTS");
+        } else {
+            appendUsingClause();
+        }
+
         errors.add("Invalid Arguments");
         errors.add("Null Argument for Primary Key");
+        errors.add("Invalid Timestamp");
+        errors.add("Invalid TTL");
 
         YCQLErrors.addExpressionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);
+    }
+
+    private void appendUsingClause() {
+        boolean useTtl = Randomly.getBoolean();
+        boolean useTimestamp = Randomly.getBoolean();
+        if (!useTtl && !useTimestamp) {
+            return;
+        }
+        sb.append(" USING ");
+        if (useTtl) {
+            // TTL is in seconds; YCQL accepts 0 .. 630720000 (20 years).
+            sb.append("TTL ").append(globalState.getRandomly().getInteger(0, 630720000));
+        }
+        if (useTimestamp) {
+            if (useTtl) {
+                sb.append(" AND ");
+            }
+            sb.append("TIMESTAMP ").append(globalState.getRandomly().getInteger(0, Integer.MAX_VALUE));
+        }
     }
 
     @Override

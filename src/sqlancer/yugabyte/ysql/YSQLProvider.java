@@ -42,6 +42,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLLockTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
+import sqlancer.yugabyte.ysql.gen.YSQLMergeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLNotifyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLPolicyGenerator;
@@ -50,7 +51,9 @@ import sqlancer.yugabyte.ysql.gen.YSQLRuleGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLSimpleVectorGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLTableGroupGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTransactionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTriggerGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTruncateGenerator;
@@ -129,7 +132,6 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case ANALYZE:
             nrPerformed = r.getInteger(0, 3);
             break;
-        case DELETE:
         case RESET_ROLE:
         case VACUUM:
         case SET_CONSTRAINTS:
@@ -139,6 +141,19 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case LISTEN:
         case UNLISTEN:
             nrPerformed = 0; // LISTEN/NOTIFY disabled (requires ysql_yb_enable_listen_notify flag)
+            break;
+        case DELETE:
+            nrPerformed = r.getInteger(0, 10);
+            break;
+        case MERGE:
+            nrPerformed = r.getInteger(0, 5);
+            break;
+        case CREATE_TABLEGROUP:
+            // Tablegroups are a YugabyteDB-only feature; skip in PostgreSQL-compatibility mode.
+            nrPerformed = isPgCompat ? 0 : r.getInteger(0, 2);
+            break;
+        case VECTOR_TEST:
+            nrPerformed = r.getInteger(0, 3);
             break;
         case TRUNCATE:
             nrPerformed = r.getInteger(0, 15);
@@ -543,7 +558,19 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_POLICY(YSQLPolicyGenerator::generate), //
         DO_BLOCK(YSQLDoBlockGenerator::generate), //
         CREATE_RULE(YSQLRuleGenerator::generate), //
-        GRANT_REVOKE(YSQLGrantRevokeGenerator::generate);
+        GRANT_REVOKE(YSQLGrantRevokeGenerator::generate), //
+        MERGE(YSQLMergeGenerator::create), //
+        CREATE_TABLEGROUP(g -> YSQLTableGroupGenerator.create()), //
+        VECTOR_TEST(g -> {
+            switch (Randomly.fromOptions(0, 1, 2)) {
+            case 0:
+                return YSQLSimpleVectorGenerator.testVectorSyntax(g);
+            case 1:
+                return YSQLSimpleVectorGenerator.testVectorIndexSyntax(g);
+            default:
+                return YSQLSimpleVectorGenerator.testVectorSettings(g);
+            }
+        });
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

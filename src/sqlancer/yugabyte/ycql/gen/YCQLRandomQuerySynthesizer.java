@@ -26,7 +26,7 @@ public final class YCQLRandomQuerySynthesizer {
         YCQLSelect select = new YCQLSelect();
         List<Node<YCQLExpression>> columns = new ArrayList<>();
         for (int i = 0; i < nrColumns; i++) {
-            Node<YCQLExpression> expression = gen.generateExpression();
+            Node<YCQLExpression> expression = gen.generateValueExpression();
             columns.add(expression);
         }
         select.setFetchColumns(columns);
@@ -38,7 +38,7 @@ public final class YCQLRandomQuerySynthesizer {
             select.setWhereClause(gen.generateExpression());
         }
         if (Randomly.getBoolean()) {
-            select.setOrderByExpressions(gen.generateOrderBys());
+            select.setOrderByExpressions(gen.generateValueOrderBys());
         }
         if (Randomly.getBoolean()) {
             select.setGroupByExpressions(Randomly.nonEmptySubset(select.getFetchColumns()));
@@ -48,6 +48,11 @@ public final class YCQLRandomQuerySynthesizer {
         }
         if (Randomly.getBoolean()) {
             select.setOffsetClause(YCQLConstant.createIntConstant(Randomly.getNotCachedInteger(0, Integer.MAX_VALUE)));
+        }
+        // ALLOW FILTERING is required for many non-partition-key filters in YCQL; emit it for half of the SELECTs
+        // that carry a WHERE clause so a larger fraction of generated queries are semantically valid.
+        if (select.getWhereClause() != null) {
+            select.setAllowFiltering(Randomly.getBoolean());
         }
         return select;
     }
