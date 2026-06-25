@@ -75,6 +75,9 @@ public final class YSQLSimpleVectorGenerator {
         errors.add("access method \"hnsw\" does not exist");
         errors.add("access method \"ybhnsw\" does not exist");
         YSQLErrors.addCommonFetchErrors(errors);
+        // A preceding failed statement aborts the surrounding transaction; this probe then cascades with
+        // "current transaction is aborted, commands ignored until end of transaction block".
+        YSQLErrors.addTransactionErrors(errors);
 
         return new SQLQueryAdapter(sb.toString(), errors, true);
     }
@@ -103,19 +106,25 @@ public final class YSQLSimpleVectorGenerator {
         }
         sb.append(")");
 
-        // Try to add HNSW parameters
+        // Try to add HNSW parameters. Only emit WITH (...) when at least one parameter is present, and place the
+        // comma only between two present parameters - otherwise we generate invalid syntax ("WITH ()", a trailing
+        // comma, or two params with no separator).
         if (method.contains("hnsw") && Randomly.getBoolean()) {
-            sb.append(" WITH (");
-            if (Randomly.getBoolean()) {
-                sb.append("m = ").append(Randomly.fromOptions(4, 16, 32));
-                if (Randomly.getBoolean()) {
-                    sb.append(", ");
+            boolean addM = Randomly.getBoolean();
+            boolean addEfConstruction = Randomly.getBoolean();
+            if (addM || addEfConstruction) {
+                sb.append(" WITH (");
+                if (addM) {
+                    sb.append("m = ").append(Randomly.fromOptions(4, 16, 32));
                 }
+                if (addEfConstruction) {
+                    if (addM) {
+                        sb.append(", ");
+                    }
+                    sb.append("ef_construction = ").append(Randomly.fromOptions(64, 200, 500));
+                }
+                sb.append(")");
             }
-            if (Randomly.getBoolean()) {
-                sb.append("ef_construction = ").append(Randomly.fromOptions(64, 200, 500));
-            }
-            sb.append(")");
         }
 
         ExpectedErrors errors = new ExpectedErrors();
