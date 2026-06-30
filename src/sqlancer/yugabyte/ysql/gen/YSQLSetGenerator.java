@@ -142,6 +142,21 @@ public final class YSQLSetGenerator {
         YB_PREFER_BNL("yb_prefer_bnl", (r) -> Randomly.fromOptions("on", "off")),
         YB_ENABLE_BITMAPSCAN("yb_enable_bitmapscan", (r) -> Randomly.fromOptions("on", "off")),
         YB_ENABLE_PARALLEL_APPEND("yb_enable_parallel_append", (r) -> Randomly.fromOptions("on", "off")),
+        // In-place index update optimization - exercised together with unique indexes on nullable columns and
+        // primary-key updates, the shape that produced a unique-index consistency bug (yugabyte-db #32220).
+        YB_ENABLE_INPLACE_INDEX_UPDATE("yb_enable_inplace_index_update", (r) -> Randomly.fromOptions("on", "off")),
+        // Parallel scan toggles - parallelism is plan-only and must not change results.
+        YB_ENABLE_PARALLEL_SCAN_RANGE("yb_enable_parallel_scan_range_sharded",
+                (r) -> Randomly.fromOptions("on", "off")),
+        YB_ENABLE_PARALLEL_SCAN_COLOCATED("yb_enable_parallel_scan_colocated",
+                (r) -> Randomly.fromOptions("on", "off")),
+        YB_ENABLE_PARALLEL_SCAN_HASH("yb_enable_parallel_scan_hash_sharded", (r) -> Randomly.fromOptions("on", "off")),
+        // Additional DocDB pushdown toggles.
+        YB_ENABLE_SAOP_PUSHDOWN("yb_enable_saop_pushdown", (r) -> Randomly.fromOptions("on", "off")),
+        YB_ENABLE_SEQUENCE_PUSHDOWN("yb_enable_sequence_pushdown", (r) -> Randomly.fromOptions("on", "off")),
+        YB_PUSHDOWN_IS_NOT_NULL("yb_pushdown_is_not_null", (r) -> Randomly.fromOptions("on", "off")),
+        YB_PUSHDOWN_STRICT_INEQUALITY("yb_pushdown_strict_inequality", (r) -> Randomly.fromOptions("on", "off")),
+        YB_BYPASS_COND_RECHECK("yb_bypass_cond_recheck", (r) -> Randomly.fromOptions("on", "off")),
 
         // ===== TIER 3: Edge Cases =====
         // Prepared Statement Handling

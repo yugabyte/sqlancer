@@ -50,6 +50,28 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_enable_distinct_pushdown=off" }, //
             { "yb_enable_index_aggregate_pushdown=off" }, //
             { "yb_enable_hash_batch_in=off" }, //
+            { "yb_enable_saop_pushdown=off" }, //
+            { "yb_enable_sequence_pushdown=off" }, //
+            { "yb_pushdown_strict_inequality=off" }, //
+            { "yb_pushdown_is_not_null=off" }, //
+            { "yb_bypass_cond_recheck=off" }, //
+            // Force parallel scans: zero the cost thresholds and grant workers so the planner picks a parallel plan.
+            // Parallelism only changes the physical plan, so results must match the serial run. Targets the parallel
+            // range / colocated / append scan paths.
+            { "max_parallel_workers_per_gather=2", "parallel_setup_cost=0", "parallel_tuple_cost=0",
+                    "min_parallel_table_scan_size=0", "min_parallel_index_scan_size=0", "yb_parallel_range_rows=1",
+                    "yb_enable_parallel_scan_range_sharded=on", "yb_enable_parallel_scan_colocated=on",
+                    "yb_enable_parallel_scan_hash_sharded=on" }, //
+            { "max_parallel_workers_per_gather=2", "parallel_setup_cost=0", "min_parallel_table_scan_size=0",
+                    "yb_parallel_range_rows=1", "yb_enable_parallel_append=on" }, //
+            { "max_parallel_workers_per_gather=2", "parallel_setup_cost=0", "min_parallel_table_scan_size=0",
+                    "yb_parallel_range_rows=1", "parallel_leader_participation=off" }, //
+            // Shrink the DocDB fetch batch so multi-roundtrip paging is exercised; row count must be unaffected.
+            { "yb_fetch_row_limit=1" }, //
+            { "yb_fetch_row_limit=0", "yb_fetch_size_limit=1024" }, //
+            // Cost-model / statistics toggles change plan choice only.
+            { "yb_enable_base_scans_cost_model=on" }, //
+            { "yb_enable_optimizer_statistics=on" }, //
     };
 
     private final YSQLGlobalState state;
