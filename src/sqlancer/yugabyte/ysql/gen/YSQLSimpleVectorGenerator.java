@@ -14,6 +14,22 @@ public final class YSQLSimpleVectorGenerator {
     private YSQLSimpleVectorGenerator() {
     }
 
+    // Creates the pgvector extension so the other branches exercise a real vector type/index rather than failing with
+    // "type vector does not exist". Only emitted when the cluster reports pgvector as available.
+    public static SQLQueryAdapter createVectorExtension() {
+        ExpectedErrors errors = new ExpectedErrors();
+        errors.add("permission denied to create extension");
+        errors.add("must be superuser");
+        errors.add("could not open extension control file");
+        errors.add("is not available");
+        errors.add("does not exist");
+        errors.add("already exists");
+        errors.add("not supported");
+        errors.add("This statement not supported yet");
+        YSQLErrors.addTransactionErrors(errors);
+        return new SQLQueryAdapter("CREATE EXTENSION IF NOT EXISTS vector", errors, true);
+    }
+
     // Exercises vector literal / distance / cast syntax with mock vector data.
     public static SQLQueryAdapter testVectorSyntax(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder();

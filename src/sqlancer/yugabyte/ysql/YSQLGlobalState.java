@@ -24,6 +24,9 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
     private List<String> operators = Collections.emptyList();
     private List<String> collates = Collections.emptyList();
     private List<String> opClasses = Collections.emptyList();
+    // Whether the pgvector extension can be created on this cluster. Detected once at connection setup so the
+    // VECTOR_TEST action is skipped entirely on builds without pgvector instead of emitting guaranteed-failing SQL.
+    private boolean vectorAvailable;
     private List<Character> allowedFunctionTypes = Arrays.asList(IMMUTABLE, STABLE, VOLATILE);
 
     @Override
@@ -33,9 +36,24 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
             this.opClasses = getOpclasses(getConnection());
             this.operators = getOperators(getConnection());
             this.collates = getCollnames(getConnection());
+            this.vectorAvailable = checkVectorAvailable(getConnection());
         } catch (SQLException e) {
             throw new AssertionError(e);
         }
+    }
+
+    // Read-only probe of pg_available_extensions; swallows its own errors so connection setup is never broken by it.
+    private boolean checkVectorAvailable(SQLConnection con) {
+        try (Statement s = con.createStatement();
+                ResultSet rs = s.executeQuery("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")) {
+            return rs.next();
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    public boolean isVectorAvailable() {
+        return vectorAvailable;
     }
 
     @Override

@@ -562,10 +562,17 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         MERGE(YSQLMergeGenerator::create), //
         CREATE_TABLEGROUP(g -> YSQLTableGroupGenerator.create()), //
         VECTOR_TEST(g -> {
-            switch (Randomly.fromOptions(0, 1, 2)) {
+            // pgvector is not installable on this build - skip rather than emit guaranteed-failing vector SQL.
+            if (!g.isVectorAvailable()) {
+                throw new IgnoreMeException();
+            }
+            switch (Randomly.fromOptions(0, 1, 2, 3)) {
             case 0:
-                return YSQLSimpleVectorGenerator.testVectorSyntax(g);
+                // Create the extension so the other branches exercise real pgvector instead of "type does not exist".
+                return YSQLSimpleVectorGenerator.createVectorExtension();
             case 1:
+                return YSQLSimpleVectorGenerator.testVectorSyntax(g);
+            case 2:
                 return YSQLSimpleVectorGenerator.testVectorIndexSyntax(g);
             default:
                 return YSQLSimpleVectorGenerator.testVectorSettings(g);
