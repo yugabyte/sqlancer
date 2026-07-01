@@ -13,6 +13,7 @@ import sqlancer.common.oracle.CompositeTestOracle;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
 import sqlancer.yugabyte.ysql.oracle.YSQLBlockedDDL;
+import sqlancer.yugabyte.ysql.oracle.YSQLCERTOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
 import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
 import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
@@ -110,6 +111,24 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLScanGUCOracle(globalState);
+            }
+        },
+        CERT {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLCERTOracle(globalState);
+            }
+        },
+        WHERE {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLTLPWhereOracle(globalState);
+            }
+        },
+        AGGREGATE {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLTLPAggregateOracle(globalState);
             }
         }
 
