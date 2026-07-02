@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.SQLConnection;
 import sqlancer.common.oracle.PivotedQuerySynthesisBase;
@@ -117,6 +118,11 @@ public class YSQLPivotedQuerySynthesisOracle
         YSQLSelect selectStatement = new YSQLSelect();
         selectStatement.setSelectType(Randomly.fromOptions(YSQLSelect.SelectType.values()));
         List<YSQLColumn> columns = randomFromTables.getColumns();
+        // A select must have at least one fetch column; setFetchColumns rejects an empty list. Skip the round rather
+        // than crash if the chosen tables expose no columns.
+        if (columns.isEmpty()) {
+            throw new IgnoreMeException();
+        }
         pivotRow = randomFromTables.getRandomRowValue(globalState.getConnection());
 
         fetchColumns = columns;

@@ -38,8 +38,13 @@ public class YSQLBinaryComparisonOperation extends BinaryOperatorNode<YSQLExpres
         IS_DISTINCT("IS DISTINCT FROM") {
             @Override
             public YSQLConstant getExpectedValue(YSQLConstant leftVal, YSQLConstant rightVal) {
-                return YSQLConstant
-                        .createBooleanConstant(!IS_NOT_DISTINCT.getExpectedValue(leftVal, rightVal).asBoolean());
+                YSQLConstant isNotDistinct = IS_NOT_DISTINCT.getExpectedValue(leftVal, rightVal);
+                // IS NOT DISTINCT can yield a NULL/non-boolean constant for incomparable operands; asBoolean() would
+                // then throw. Propagate NULL instead - PQS handles a NULL expected value via an IS NULL rectification.
+                if (isNotDistinct.isNull()) {
+                    return isNotDistinct;
+                }
+                return YSQLConstant.createBooleanConstant(!isNotDistinct.asBoolean());
             }
         },
         IS_NOT_DISTINCT("IS NOT DISTINCT FROM") {
