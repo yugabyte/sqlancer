@@ -85,8 +85,11 @@ public class YSQLCERTOracle extends CERTOracleBase<YSQLGlobalState> implements T
         String queryString1 = YSQLVisitor.asString(select);
         int rowCount1 = getRow(state, queryString1, queryPlan1Sequences);
 
-        // Exclude JOIN: YSQLJoin cannot safely swap ON clauses here.
-        boolean increase = mutate(Mutator.JOIN);
+        // Exclude JOIN (YSQLJoin cannot safely swap ON clauses here) and the predicate-selectivity mutations
+        // (WHERE/AND/OR): YB estimates the selectivity of arbitrary boolean expressions coarsely and
+        // non-monotonically, so those mutations produce false positives rather than real cardinality bugs. Keep the
+        // structural mutations (DISTINCT/GROUP BY/HAVING/LIMIT).
+        boolean increase = mutate(Mutator.JOIN, Mutator.WHERE, Mutator.AND, Mutator.OR);
 
         String queryString2 = YSQLVisitor.asString(select);
         int rowCount2 = getRow(state, queryString2, queryPlan2Sequences);

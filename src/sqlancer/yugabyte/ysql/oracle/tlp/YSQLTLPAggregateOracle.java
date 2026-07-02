@@ -72,8 +72,11 @@ public class YSQLTLPAggregateOracle extends YSQLTLPBase implements TestOracle<YS
         String firstQueryString = String.format(queryFormatString, originalQuery, firstResult);
         String secondQueryString = String.format(queryFormatString, metamorphicQuery, secondResult);
         state.getState().getLocalState().log(String.format("%s\n%s", firstQueryString, secondQueryString));
+        // Compare with trailing whitespace stripped: MAX/MIN over a CHAR(n) column is blank-padded to n, and the
+        // direct vs UNION ALL forms pad differently. Trailing spaces are insignificant for CHAR, so an exact match
+        // would raise a spurious "results mismatch".
         if (firstResult == null && secondResult != null || firstResult != null && secondResult == null
-                || firstResult != null && !firstResult.contentEquals(secondResult)
+                || firstResult != null && !firstResult.stripTrailing().equals(secondResult.stripTrailing())
                         && !ComparatorHelper.isEqualDouble(firstResult, secondResult)) {
             if (secondResult != null && secondResult.contains("Inf")) {
                 throw new IgnoreMeException(); // FIXME: average computation
