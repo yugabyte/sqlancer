@@ -286,11 +286,15 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             createDatabaseSync(globalState, entryDatabaseName);
         }
 
+        // When database creation is disabled (e.g. the BLOCKED_DDL oracle), the per-thread "databaseN" is never
+        // created, so connect to the pre-existing entry database instead of a name that does not exist.
+        String targetDatabaseName = globalState.getDbmsSpecificOptions().createDatabases ? databaseName
+                : entryDatabaseName;
         int databaseIndex = entryURL.indexOf("/" + entryDatabaseName) + 1;
         String preDatabaseName = entryURL.substring(0, databaseIndex);
         String postDatabaseName = entryURL.substring(databaseIndex + entryDatabaseName.length());
-        testURL = preDatabaseName + databaseName + postDatabaseName;
-        globalState.getState().logStatement(String.format("\\c %s;", databaseName));
+        testURL = preDatabaseName + targetDatabaseName + postDatabaseName;
+        globalState.getState().logStatement(String.format("\\c %s;", targetDatabaseName));
 
         return new SQLConnection(createConnectionSafely(testURL, username, password));
     }

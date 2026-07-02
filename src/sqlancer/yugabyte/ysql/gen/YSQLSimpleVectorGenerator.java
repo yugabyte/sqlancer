@@ -131,7 +131,8 @@ public final class YSQLSimpleVectorGenerator {
             if (addM || addEfConstruction) {
                 sb.append(" WITH (");
                 if (addM) {
-                    sb.append("m = ").append(Randomly.fromOptions(4, 16, 32));
+                    // YB's ybhnsw rejects small m values ("value N out of bounds for option m"), so stay >= 16.
+                    sb.append("m = ").append(Randomly.fromOptions(16, 32, 48, 64));
                 }
                 if (addEfConstruction) {
                     if (addM) {
@@ -152,6 +153,7 @@ public final class YSQLSimpleVectorGenerator {
         errors.add("has no default operator class");
         errors.add("cannot create index on dimensionless vector column");
         errors.add("vector indexes do not support");
+        errors.add("out of bounds for option");
         errors.add("extension");
         errors.add("must be installed");
         YSQLErrors.addCommonTableErrors(errors);
@@ -168,8 +170,9 @@ public final class YSQLSimpleVectorGenerator {
             sb.append("LOCAL ");
         }
 
-        // Try to set vector-related parameters
-        String param = Randomly.fromOptions("hnsw.ef_search", "ybhnsw.ef_search", "ivfflat.probes");
+        // Try to set vector-related parameters. "ybhnsw" is a reserved GUC prefix on YugabyteDB (SET always fails
+        // with "invalid configuration parameter name"), so it is not a useful probe target - omit it.
+        String param = Randomly.fromOptions("hnsw.ef_search", "ivfflat.probes");
 
         sb.append(param).append(" = ");
         sb.append(Randomly.fromOptions(10, 40, 100, 200));
@@ -178,6 +181,8 @@ public final class YSQLSimpleVectorGenerator {
         errors.add("unrecognized configuration parameter");
         errors.add("cannot be set");
         errors.add("invalid value for parameter");
+        errors.add("invalid configuration parameter name");
+        errors.add("reserved prefix");
         YSQLErrors.addTransactionErrors(errors);
 
         return new SQLQueryAdapter(sb.toString(), errors);
