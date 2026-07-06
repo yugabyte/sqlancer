@@ -239,9 +239,9 @@ public class YSQLFunction implements YSQLExpression {
                 if (evaluatedArgs[0].isNull()) {
                     return YSQLConstant.createNullConstant();
                 }
-                // Cast to INT first to get numeric value, then perform operation
+                // Cast to INT first to get the numeric value; CEIL of an already-integral value is that value.
                 long val = evaluatedArgs[0].cast(YSQLDataType.INT).asInt();
-                return YSQLConstant.createIntConstant((long) Math.ceil(val));
+                return YSQLConstant.createIntConstant(val);
             }
 
             @Override
@@ -326,10 +326,12 @@ public class YSQLFunction implements YSQLExpression {
                 String str = evaluatedArgs[0].asString();
                 int start = (int) evaluatedArgs[1].asInt() - 1; // PostgreSQL uses 1-based indexing
                 int length = (int) evaluatedArgs[2].asInt();
-                if (start < 0)
+                if (start < 0) {
                     start = 0;
-                if (start >= str.length())
+                }
+                if (start >= str.length()) {
                     return YSQLConstant.createTextConstant("");
+                }
                 int end = Math.min(start + length, str.length());
                 return YSQLConstant.createTextConstant(str.substring(start, end));
             }

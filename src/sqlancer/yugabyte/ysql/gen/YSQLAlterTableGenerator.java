@@ -404,6 +404,8 @@ public class YSQLAlterTableGenerator {
                 case "toast_tuple_target":
                     sb.append(Randomly.getNotCachedInteger(128, 8160));
                     break;
+                default:
+                    break;
                 }
                 sb.append(")");
                 errors.add("unrecognized parameter");
@@ -559,8 +561,9 @@ public class YSQLAlterTableGenerator {
                 if (Randomly.getBoolean()) {
                     sb.append("FOR VALUES IN (");
                     for (int j = 0; j < Randomly.smallNumber() + 1; j++) {
-                        if (j > 0)
+                        if (j > 0) {
                             sb.append(", ");
+                        }
                         sb.append(Randomly.getNotCachedInteger(0, 1000));
                     }
                     sb.append(")");

@@ -14,6 +14,7 @@ import sqlancer.common.oracle.CERTOracleBase;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLancerResultSet;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
@@ -85,11 +86,17 @@ public class YSQLCERTOracle extends CERTOracleBase<YSQLGlobalState> implements T
         String queryString1 = YSQLVisitor.asString(select);
         int rowCount1 = getRow(state, queryString1, queryPlan1Sequences);
 
-        // Exclude JOIN (YSQLJoin cannot safely swap ON clauses here) and the predicate-selectivity mutations
-        // (WHERE/AND/OR): YB estimates the selectivity of arbitrary boolean expressions coarsely and
-        // non-monotonically, so those mutations produce false positives rather than real cardinality bugs. Keep the
-        // structural mutations (DISTINCT/GROUP BY/HAVING/LIMIT).
-        boolean increase = mutate(Mutator.JOIN, Mutator.WHERE, Mutator.AND, Mutator.OR);
+        // JOIN is always excluded: YSQLJoin cannot safely swap ON clauses here. The predicate-selectivity mutations
+        // (WHERE/AND/OR) are excluded only while YugabyteBugs.cardinalityEstimatePredicateSelectivityUnstable holds -
+        // YB estimates arbitrary boolean-expression selectivity coarsely and non-monotonically, so those mutations
+        // produce false positives rather than real cardinality bugs. Keep the structural mutations
+        // (DISTINCT/GROUP BY/HAVING/LIMIT); when YB's estimator becomes monotone, flip the flag to restore coverage.
+        boolean increase;
+        if (YugabyteBugs.cardinalityEstimatePredicateSelectivityUnstable) {
+            increase = mutate(Mutator.JOIN, Mutator.WHERE, Mutator.AND, Mutator.OR);
+        } else {
+            increase = mutate(Mutator.JOIN);
+        }
 
         String queryString2 = YSQLVisitor.asString(select);
         int rowCount2 = getRow(state, queryString2, queryPlan2Sequences);
@@ -205,24 +212,22 @@ public class YSQLCERTOracle extends CERTOracleBase<YSQLGlobalState> implements T
         }
         SQLQueryAdapter q = new SQLQueryAdapter(explainQuery, errors);
         try (SQLancerResultSet rs = q.executeAndGet(globalState)) {
-            if (rs == null) {
-                throw new IgnoreMeException();
-            }
-            while (rs.next()) {
-                String content = rs.getString(1).trim();
-                if (row == -1 && content.contains("rows=")) {
-                    try {
-                        int ind = content.indexOf("rows=");
-                        row = Integer.parseInt(content.substring(ind + 5).split(" ")[0]);
-                    } catch (NumberFormatException e) {
-                        // ignore an unparsable estimate and keep scanning
+            // A null result set leaves row == -1, which the post-loop check below turns into IgnoreMeException.
+            if (rs != null) {
+                while (rs.next()) {
+                    String content = rs.getString(1).trim();
+                    if (row == -1 && content.contains("rows=")) {
+                        try {
+                            int ind = content.indexOf("rows=");
+                            row = Integer.parseInt(content.substring(ind + 5).split(" ")[0]);
+                        } catch (NumberFormatException e) {
+                            // ignore an unparsable estimate and keep scanning
+                        }
                     }
+                    String[] planPart = content.split("-> ");
+                    queryPlanSequences.add(planPart[planPart.length - 1].split("  ")[0].trim());
                 }
-                String[] planPart = content.split("-> ");
-                queryPlanSequences.add(planPart[planPart.length - 1].split("  ")[0].trim());
             }
-        } catch (IgnoreMeException e) {
-            throw e;
         } catch (Exception e) {
             throw new AssertionError(q.getQueryString(), e);
         }

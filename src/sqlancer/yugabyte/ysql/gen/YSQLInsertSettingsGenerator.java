@@ -6,17 +6,13 @@ import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 
-/**
- * Generator for YugabyteDB 2025.1 INSERT-related settings
- */
+// Generator for YugabyteDB 2025.1 INSERT-related settings.
 public final class YSQLInsertSettingsGenerator {
 
     private YSQLInsertSettingsGenerator() {
     }
 
-    /**
-     * Set read batch size for INSERT ON CONFLICT
-     */
+    // Set read batch size for INSERT ON CONFLICT.
     public static SQLQueryAdapter setInsertOnConflictBatchSize(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
 
@@ -39,9 +35,7 @@ public final class YSQLInsertSettingsGenerator {
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 
-    /**
-     * Enable or disable in-place index updates
-     */
+    // Enable or disable in-place index updates.
     public static SQLQueryAdapter setInPlaceIndexUpdate(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
 
@@ -60,9 +54,7 @@ public final class YSQLInsertSettingsGenerator {
         return new SQLQueryAdapter(sb.toString(), errors);
     }
 
-    /**
-     * Configure DDL statement incrementing behavior
-     */
+    // Configure DDL statement incrementing behavior.
     public static SQLQueryAdapter setDDLNonIncrementing(YSQLGlobalState globalState) {
         StringBuilder sb = new StringBuilder("SET ");
 

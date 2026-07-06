@@ -1,6 +1,15 @@
 package sqlancer.yugabyte.ysql.oracle;
 
-import sqlancer.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import sqlancer.Main;
+import sqlancer.MainOptions;
+import sqlancer.Randomly;
+import sqlancer.SQLConnection;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.common.query.ExpectedErrors;
@@ -9,12 +18,6 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLProvider;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class YSQLBlockedDDL implements TestOracle<YSQLGlobalState> {
     protected final YSQLGlobalState state;
@@ -76,7 +79,6 @@ public class YSQLBlockedDDL implements TestOracle<YSQLGlobalState> {
             if (seed > 35) {
                 String tableName = DBMSCommon.createTableName(state.getSchema().getDatabaseTables().size());
                 query = YSQLTableGenerator.generate(tableName, true, state);
-                ;
             } else {
                 query = getRandomAction(catalogActions).getQuery(state);
             }

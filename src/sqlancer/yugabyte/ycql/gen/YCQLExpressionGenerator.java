@@ -67,10 +67,11 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
 
     // Generates a boolean condition suitable for a WHERE clause: one or more comparisons combined with AND/OR.
     // Comparison operands are produced in value context so no logical operator lands in a value position.
+    @Override
     public Node<YCQLExpression> generatePredicate() {
         Node<YCQLExpression> condition = generateComparison();
         while (Randomly.getBooleanWithRatherLowProbability()) {
-            condition = new NewBinaryOperatorNode<YCQLExpression>(condition, generateComparison(),
+            condition = new NewBinaryOperatorNode<>(condition, generateComparison(),
                     YCQLBinaryLogicalOperator.getRandom());
         }
         return condition;

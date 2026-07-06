@@ -47,6 +47,8 @@ public final class YSQLSequenceGenerator {
                 typeMinValue = Long.MIN_VALUE;
                 typeMaxValue = Long.MAX_VALUE;
                 break;
+            default:
+                break;
             }
         }
 
@@ -62,8 +64,9 @@ public final class YSQLSequenceGenerator {
             sb.append(" ");
             // Increment can be negative but not zero
             long increment = globalState.getRandomly().getInteger();
-            if (increment == 0)
+            if (increment == 0) {
                 increment = 1;
+            }
             sb.append(increment);
         }
 

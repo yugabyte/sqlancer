@@ -63,16 +63,16 @@ public final class YSQLParallelQueryGenerator {
         QueryType queryType = Randomly.fromOptions(QueryType.values());
         switch (queryType) {
         case AGGREGATE_PARALLEL:
-            sb.append(generateParallelAggregate(table, globalState));
+            sb.append(generateParallelAggregate(table));
             break;
         case JOIN_PARALLEL:
             sb.append(generateParallelJoin(table, globalState));
             break;
         case SCAN_PARALLEL:
-            sb.append(generateParallelScan(table, globalState));
+            sb.append(generateParallelScan(table));
             break;
         case PARTITION_PARALLEL:
-            sb.append(generateParallelPartitionQuery(table, globalState));
+            sb.append(generateParallelPartitionQuery(table));
             break;
         default:
             throw new AssertionError(queryType);
@@ -106,7 +106,7 @@ public final class YSQLParallelQueryGenerator {
         return false;
     }
 
-    private static String generateParallelAggregate(YSQLTable table, YSQLGlobalState globalState) {
+    private static String generateParallelAggregate(YSQLTable table) {
         StringBuilder sb = new StringBuilder("EXPLAIN (ANALYZE, BUFFERS) SELECT ");
 
         // Add aggregate functions
@@ -133,7 +133,7 @@ public final class YSQLParallelQueryGenerator {
     private static String generateParallelJoin(YSQLTable table1, YSQLGlobalState globalState) {
         YSQLTable table2 = globalState.getSchema().getRandomTable(t -> !t.isView() && !t.equals(table1));
         if (table2 == null) {
-            return generateParallelScan(table1, globalState);
+            return generateParallelScan(table1);
         }
 
         StringBuilder sb = new StringBuilder("EXPLAIN (ANALYZE, BUFFERS) SELECT ");
@@ -159,7 +159,7 @@ public final class YSQLParallelQueryGenerator {
         return sb.toString();
     }
 
-    private static String generateParallelScan(YSQLTable table, YSQLGlobalState globalState) {
+    private static String generateParallelScan(YSQLTable table) {
         StringBuilder sb = new StringBuilder("EXPLAIN (ANALYZE, BUFFERS) SELECT ");
 
         // Select columns
@@ -187,7 +187,7 @@ public final class YSQLParallelQueryGenerator {
         return sb.toString();
     }
 
-    private static String generateParallelPartitionQuery(YSQLTable table, YSQLGlobalState globalState) {
+    private static String generateParallelPartitionQuery(YSQLTable table) {
         StringBuilder sb = new StringBuilder("EXPLAIN (ANALYZE, BUFFERS) ");
 
         // Generate UNION ALL query to test parallel append

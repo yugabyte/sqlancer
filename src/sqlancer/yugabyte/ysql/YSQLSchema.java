@@ -4,7 +4,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.postgresql.util.PSQLException;
@@ -13,7 +17,12 @@ import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.SQLConnection;
 import sqlancer.common.DBMSCommon;
-import sqlancer.common.schema.*;
+import sqlancer.common.schema.AbstractRelationalTable;
+import sqlancer.common.schema.AbstractRowValue;
+import sqlancer.common.schema.AbstractSchema;
+import sqlancer.common.schema.AbstractTableColumn;
+import sqlancer.common.schema.AbstractTables;
+import sqlancer.common.schema.TableIndex;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 

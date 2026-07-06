@@ -86,7 +86,7 @@ public final class YSQLAlterDatabaseGenerator {
 
         GUCParameter(String name, String... values) {
             this.name = name;
-            this.values = values;
+            this.values = values.clone();
         }
 
         public boolean isYbSpecific() {
@@ -97,7 +97,7 @@ public final class YSQLAlterDatabaseGenerator {
             if (pgCompat && this == DEFAULT_TABLE_ACCESS_METHOD) {
                 return new String[] { "'heap'" };
             }
-            return values;
+            return values.clone();
         }
     }
 

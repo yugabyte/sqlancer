@@ -40,7 +40,7 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
     public boolean testCollations = true;
 
     @Parameter(names = "--pg-compatibility", description = "Run SQLancer in PG compatible mode and not use YB specific features", arity = 1)
-    public boolean pgCompatibility = false;
+    public boolean pgCompatibility;
 
     @Parameter(names = "--create-databases", description = "Evaluate CREATE DATABASE commands (otherwise use existing)", arity = 1)
     public boolean createDatabases = true;

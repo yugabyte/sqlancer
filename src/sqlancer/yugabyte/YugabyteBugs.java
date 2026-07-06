@@ -10,6 +10,13 @@ public final class YugabyteBugs {
     // While unfixed, do not generate logical operators in value contexts so the fuzzer can explore past this crash.
     public static boolean bugYcqlLogicalInValueContext = true;
 
+    // YSQL: the optimizer estimates the selectivity of arbitrary boolean expressions coarsely and non-monotonically
+    // (e.g. "A OR B" can be estimated below "A"), so the CERT oracle's predicate-selectivity mutations (WHERE/AND/OR)
+    // produce false positives rather than real cardinality bugs. While this holds, YSQLCERTOracle keeps only the
+    // structural mutations (DISTINCT/GROUP BY/HAVING/LIMIT); flip to false to restore predicate coverage once YB's
+    // estimator is monotone.
+    public static boolean cardinalityEstimatePredicateSelectivityUnstable = true;
+
     private YugabyteBugs() {
     }
 
