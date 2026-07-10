@@ -295,7 +295,7 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             sb.append("ONLY ");
         }
         sb.append(from.getTable().getName());
-        if (!from.isOnly() && Randomly.getBoolean()) {
+        if (from.isIncludeDescendants()) {
             sb.append("*");
         }
     }

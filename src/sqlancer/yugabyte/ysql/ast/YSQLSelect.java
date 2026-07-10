@@ -98,10 +98,16 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
     public static class YSQLFromTable implements YSQLExpression {
         private final YSQLTable t;
         private final boolean only;
+        private final boolean includeDescendants;
 
         public YSQLFromTable(YSQLTable t, boolean only) {
             this.t = t;
             this.only = only;
+            // Decide the inheritance-descendants "*" suffix once, here, instead of at render time. Rendering the same
+            // node twice (e.g. the CERT oracle EXPLAINs the query before and after a mutation) must produce identical
+            // SQL; a render-time Randomly.getBoolean() made "FROM t" flip to "FROM t*" between renders, so the oracle
+            // compared two different queries and could report a spurious "Inconsistent cardinality estimate".
+            this.includeDescendants = !only && Randomly.getBoolean();
         }
 
         public YSQLTable getTable() {
@@ -110,6 +116,10 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
 
         public boolean isOnly() {
             return only;
+        }
+
+        public boolean isIncludeDescendants() {
+            return includeDescendants;
         }
 
         @Override
