@@ -1,6 +1,7 @@
 package sqlancer.yugabyte.ysql;
 
 import sqlancer.common.query.ExpectedErrors;
+import sqlancer.yugabyte.YugabyteBugs;
 
 public final class YSQLErrors {
 
@@ -21,6 +22,9 @@ public final class YSQLErrors {
         errors.add("hit the limit");
         errors.add("insufficient disk space");
         errors.add("NullTest indexqual has wrong key");
+        if (YugabyteBugs.bugPlannerVariableNotFoundInSubplan) {
+            errors.add("variable not found in subplan target list");
+        }
     }
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {
@@ -119,6 +123,9 @@ public final class YSQLErrors {
         errors.add("Read Committed isolation level not supported");
         errors.add("yb_enable_read_committed_isolation must be enabled");
         errors.add("could not serialize access due to read/write dependencies among transactions");
+        // Serializable isolation picks its read time in the storage layer, so statements that supply a read time
+        // (e.g. ANALYZE run inside a serializable transaction) are rejected - legitimate YB behavior, not a bug.
+        errors.add("Serializable transaction picks the read time in the storage layer");
         errors.add("Transaction aborted");
         errors.add("Transaction conflicted");
         errors.add("current transaction is aborted, commands ignored until end of transaction block");

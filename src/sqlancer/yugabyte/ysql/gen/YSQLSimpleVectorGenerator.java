@@ -91,6 +91,9 @@ public final class YSQLSimpleVectorGenerator {
         errors.add("access method \"hnsw\" does not exist");
         errors.add("access method \"ybhnsw\" does not exist");
         YSQLErrors.addCommonFetchErrors(errors);
+        // The vector_aggregate branch queries an arbitrary table, which may be a view whose definition contains
+        // expressions that fail at evaluation (e.g. "result of range union would not be contiguous"); tolerate them.
+        YSQLErrors.addCommonExpressionErrors(errors);
         // A preceding failed statement aborts the surrounding transaction; this probe then cascades with
         // "current transaction is aborted, commands ignored until end of transaction block".
         YSQLErrors.addTransactionErrors(errors);

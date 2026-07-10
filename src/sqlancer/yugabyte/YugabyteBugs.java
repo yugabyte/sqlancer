@@ -17,6 +17,11 @@ public final class YugabyteBugs {
     // estimator is monotone.
     public static boolean cardinalityEstimatePredicateSelectivityUnstable = true;
 
+    // YSQL: the planner raises the internal error "variable not found in subplan target list" for some correlated
+    // subqueries over inheritance parents (e.g. DELETE FROM ONLY t WHERE NOT EXISTS (SELECT ... FROM p*, ONLY t, ...)).
+    // Known YB bug; tolerate the error while unfixed and flip to false to start catching it once resolved.
+    public static boolean bugPlannerVariableNotFoundInSubplan = true;
+
     private YugabyteBugs() {
     }
 
