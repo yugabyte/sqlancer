@@ -105,7 +105,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         int nrPerformed;
         switch (a) {
         case CREATE_INDEX:
-            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 3);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 3);
             break;
         case DISCARD:
         case DROP_INDEX:
@@ -124,7 +124,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             nrPerformed = r.getInteger(0, 3);
             break;
         case ALTER_TABLE:
-            nrPerformed = isCatalogTest ? r.getInteger(0, 20) : r.getInteger(0, 5);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 7) : r.getInteger(0, 5);
             break;
         case RESET:
             nrPerformed = r.getInteger(0, 3);
@@ -156,19 +156,20 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             nrPerformed = r.getInteger(0, 3);
             break;
         case TRUNCATE:
-            nrPerformed = r.getInteger(0, 15);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 15);
             break;
         case CREATE_SEQUENCE:
-            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 15);
+            // CATALOG amplifier removed: 0-30 concentrated on one colocated node starved 8 GB hosts. Baseline 0-15.
+            nrPerformed = r.getInteger(0, 15);
             break;
         case CREATE_VIEW:
-            nrPerformed = isCatalogTest ? r.getInteger(0, 30) : r.getInteger(0, 5);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 5);
             break;
         case REFRESH_VIEW:
-            nrPerformed = r.getInteger(0, 20);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 20);
             break;
         case UPDATE:
-            nrPerformed = r.getInteger(0, 20);
+            nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 20);
             break;
         case INSERT:
             nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
