@@ -44,6 +44,7 @@ public final class DuckDBErrors {
         // collate
         errors.add("Cannot combine types with different collation!");
         errors.add("collations are only supported for type varchar");
+        errors.add("COLLATE can only be applied to varchar columns");
 
         errors.add("Like pattern must not end with escape character!"); // LIKE
 
@@ -115,7 +116,7 @@ public final class DuckDBErrors {
         errors.addAll(getFunctionErrors());
 
         errors.add("NOT NULL constraint failed");
-        errors.add("PRIMARY KEY or UNIQUE constraint violated");
+        errors.add("PRIMARY KEY or UNIQUE constraint violation");
         errors.add("Duplicate key");
         errors.add("can't be cast because the value is out of range for the destination type");
         errors.add("Could not convert string");

@@ -33,6 +33,7 @@ public final class MySQLErrors {
         }
 
         errors.add(Pattern.compile("Unknown column '.*' in 'order clause'"));
+        errors.add(Pattern.compile("Unknown column '.*' in 'EXISTS subquery'"));
 
         return errors;
     }
@@ -48,11 +49,14 @@ public final class MySQLErrors {
         errors.add("doesn't have a default value");
         errors.add("Data truncation");
         errors.add("Incorrect integer value");
+        errors.add("Incorrect FLOAT value");
+        errors.add("Incorrect DOUBLE value");
         errors.add("Duplicate entry");
         errors.add("Data truncated for column");
         errors.add("Data truncated for functional index");
         errors.add("cannot be null");
         errors.add("Incorrect decimal value");
+        errors.add("The value specified for generated column");
 
         return errors;
     }

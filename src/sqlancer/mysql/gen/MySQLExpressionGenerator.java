@@ -26,6 +26,7 @@ import sqlancer.mysql.ast.MySQLBinaryLogicalOperation;
 import sqlancer.mysql.ast.MySQLBinaryLogicalOperation.MySQLBinaryLogicalOperator;
 import sqlancer.mysql.ast.MySQLBinaryOperation;
 import sqlancer.mysql.ast.MySQLBinaryOperation.MySQLBinaryOperator;
+import sqlancer.mysql.ast.MySQLCaseOperator;
 import sqlancer.mysql.ast.MySQLCastOperation;
 import sqlancer.mysql.ast.MySQLColumnReference;
 import sqlancer.mysql.ast.MySQLComputableFunction;
@@ -64,7 +65,7 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
 
     private enum Actions {
         COLUMN, LITERAL, UNARY_PREFIX_OPERATION, UNARY_POSTFIX, COMPUTABLE_FUNCTION, BINARY_LOGICAL_OPERATOR,
-        BINARY_COMPARISON_OPERATION, CAST, IN_OPERATION, BINARY_OPERATION, EXISTS, BETWEEN_OPERATOR;
+        BINARY_COMPARISON_OPERATION, CAST, IN_OPERATION, BINARY_OPERATION, EXISTS, BETWEEN_OPERATOR, CASE_OPERATOR;
     }
 
     @Override
@@ -111,12 +112,16 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
         case EXISTS:
             return getExists();
         case BETWEEN_OPERATOR:
-            if (MySQLBugs.bug99181) {
+            if (MySQLBugs.bug99182) {
                 // TODO: there are a number of bugs that are triggered by the BETWEEN operator
                 throw new IgnoreMeException();
             }
             return new MySQLBetweenOperation(generateExpression(depth + 1), generateExpression(depth + 1),
                     generateExpression(depth + 1));
+        case CASE_OPERATOR:
+            int nr = Randomly.smallNumber() + 1;
+            return new MySQLCaseOperator(generateExpression(depth + 1), generateExpressions(nr, depth + 1),
+                    generateExpressions(nr, depth + 1), generateExpression(depth + 1));
         default:
             throw new AssertionError();
         }
@@ -248,7 +253,9 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
 
     @Override
     public String generateExplainQuery(MySQLSelect select) {
-        return "EXPLAIN " + select.asString();
+        return "EXPLAIN FORMAT=TRADITIONAL " + select.asString(); // as of MySQL 9.5.0, default EXPLAIN format changed
+                                                                  // from TRADITIONAL to TREE, hence TRADITIONAL must
+                                                                  // now be specified
     }
 
     public MySQLAggregate generateAggregate() {
@@ -301,7 +308,7 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
     }
 
     boolean mutateGroupBy(MySQLSelect select) {
-        boolean increase = select.getGroupByExpressions().size() > 0;
+        boolean increase = !select.getGroupByExpressions().isEmpty();
         if (increase) {
             select.clearGroupByExpressions();
         } else {
@@ -311,7 +318,7 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
     }
 
     boolean mutateHaving(MySQLSelect select) {
-        if (select.getGroupByExpressions().size() == 0) {
+        if (select.getGroupByExpressions().isEmpty()) {
             select.setGroupByExpressions(select.getFetchColumns());
             select.setHavingClause(generateExpression());
             return false;

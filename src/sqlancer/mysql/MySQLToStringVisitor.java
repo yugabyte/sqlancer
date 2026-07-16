@@ -11,6 +11,7 @@ import sqlancer.mysql.ast.MySQLBetweenOperation;
 import sqlancer.mysql.ast.MySQLBinaryComparisonOperation;
 import sqlancer.mysql.ast.MySQLBinaryLogicalOperation;
 import sqlancer.mysql.ast.MySQLBinaryOperation;
+import sqlancer.mysql.ast.MySQLCaseOperator;
 import sqlancer.mysql.ast.MySQLCastOperation;
 import sqlancer.mysql.ast.MySQLCollate;
 import sqlancer.mysql.ast.MySQLColumnReference;
@@ -59,7 +60,7 @@ public class MySQLToStringVisitor extends ToStringVisitor<MySQLExpression> imple
             throw new AssertionError();
         }
         sb.append(s.getModifiers().stream().collect(Collectors.joining(" ")));
-        if (s.getModifiers().size() > 0) {
+        if (!s.getModifiers().isEmpty()) {
             sb.append(" ");
         }
         if (s.getFetchColumns() == null) {
@@ -92,7 +93,7 @@ public class MySQLToStringVisitor extends ToStringVisitor<MySQLExpression> imple
             sb.append(" WHERE ");
             visit(whereClause);
         }
-        if (s.getGroupByExpressions() != null && s.getGroupByExpressions().size() > 0) {
+        if (s.getGroupByExpressions() != null && !s.getGroupByExpressions().isEmpty()) {
             sb.append(" ");
             sb.append("GROUP BY ");
             List<MySQLExpression> groupBys = s.getGroupByExpressions();
@@ -344,5 +345,31 @@ public class MySQLToStringVisitor extends ToStringVisitor<MySQLExpression> imple
             visit(exprs.get(i));
         }
         sb.append(")");
+    }
+
+    @Override
+    public void visit(MySQLCaseOperator caseOp) {
+        sb.append("(CASE ");
+
+        if (caseOp.getSwitchCondition() != null) {
+            visit(caseOp.getSwitchCondition());
+            sb.append(" ");
+        }
+
+        for (int i = 0; i < caseOp.getConditions().size(); i++) {
+            if (i > 0) {
+                sb.append(" ");
+            }
+            sb.append("WHEN ");
+            visit(caseOp.getConditions().get(i));
+            sb.append(" THEN ");
+            visit(caseOp.getExpressions().get(i));
+        }
+
+        if (caseOp.getElseExpr() != null) {
+            sb.append(" ELSE ");
+            visit(caseOp.getElseExpr());
+        }
+        sb.append(" END)");
     }
 }
