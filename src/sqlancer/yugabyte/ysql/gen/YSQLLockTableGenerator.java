@@ -30,6 +30,10 @@ public final class YSQLLockTableGenerator {
         errors.add("does not exist");
         errors.add("is not a table");
         errors.add("cannot be locked");
+        // Materialized views are not flagged as views by isView(), so they slip through the filter above; LOCK TABLE
+        // rejects them.
+        errors.add("cannot lock relation");
+        errors.add("not supported for materialized views");
         errors.add("deadlock detected");
         errors.add("canceling statement due to lock timeout");
         errors.add("not supported yet");

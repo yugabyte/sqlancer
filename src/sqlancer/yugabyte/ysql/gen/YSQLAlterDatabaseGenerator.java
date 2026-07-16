@@ -23,8 +23,9 @@ public final class YSQLAlterDatabaseGenerator {
         DATE_STYLE("DateStyle", "'ISO, MDY'", "'ISO, DMY'", "'ISO, Postgres, MDY'", "'ISO, SQL, MDY'"),
         TIME_ZONE("TimeZone", "'UTC'", "'America/New_York'", "'Europe/London'", "'Asia/Tokyo'"),
         INTERVAL_STYLE("IntervalStyle", "'postgres'", "'sql_standard'", "'postgres_verbose'", "'iso_8601'"),
-        // Timeouts
-        STATEMENT_TIMEOUT("statement_timeout", "'0'", "'1000'", "'5000'", "'30000'"),
+        // Timeouts. statement_timeout=0 (unlimited) makes YB issue a 24h RPC deadline, which the tserver logs as
+        // "proxy.cc: Too big timeout specified" tens of thousands of times (LOG_SPEW); keep it bounded.
+        STATEMENT_TIMEOUT("statement_timeout", "'1000'", "'5000'", "'30000'"),
         LOCK_TIMEOUT("lock_timeout", "'0'", "'1000'", "'5000'", "'10000'"),
         IDLE_IN_TRANSACTION_SESSION_TIMEOUT("idle_in_transaction_session_timeout", "'0'", "'10000'", "'60000'"),
         IDLE_SESSION_TIMEOUT("idle_session_timeout", "'0'", "'60000'", "'300000'"),

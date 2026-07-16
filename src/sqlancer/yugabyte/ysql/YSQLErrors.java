@@ -52,6 +52,8 @@ public final class YSQLErrors {
 
         errors.add("canceling statement due to statement timeout");
         errors.add("LATERAL reference to table");
+        // Large metamorphic queries (cross joins, LATERAL) can spill past temp_file_limit - a resource cap, not a bug.
+        errors.add("temporary file size exceeds temp_file_limit");
     }
 
     public static void addCommonTableErrors(ExpectedErrors errors) {
@@ -130,6 +132,9 @@ public final class YSQLErrors {
         errors.add("Transaction conflicted");
         errors.add("current transaction is aborted, commands ignored until end of transaction block");
         errors.add("current transaction is expired or aborted");
+        // TRUNCATE/REFRESH MATERIALIZED VIEW/etc. against a relation that still has an open portal or cursor in the
+        // same session - legitimate PG/YB rejection, not a bug.
+        errors.add("because it is being used by active queries in this session");
         // Wait-on-Conflict errors
         errors.add("Wait queue operation failed");
         errors.add("yb_enable_wait_queues must be enabled");
