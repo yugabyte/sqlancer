@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import sqlancer.GlobalState;
+import sqlancer.IgnoreMeException;
 import sqlancer.Main;
 import sqlancer.SQLConnection;
 
@@ -200,6 +201,13 @@ public class SQLQueryAdapter extends Query<SQLConnection> implements Serializabl
                 return null;
             }
             return new SQLancerResultSet(result);
+        } catch (OutOfMemoryError e) {
+            if (s != null) {
+                s.close();
+            }
+            // A query that materializes a huge result set can exhaust the client JVM heap (the JDBC driver buffers all
+            // rows). That is a client resource limit, not a DB bug - skip the round instead of a false positive.
+            throw new IgnoreMeException();
         } catch (Exception e) {
             if (s != null) {
                 s.close();
