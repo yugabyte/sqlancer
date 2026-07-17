@@ -1,8 +1,6 @@
 target/
 .classpath
-.settings/org.eclipse.core.resources.prefs
-.settings/org.eclipse.m2e.core.prefs
-.settings/org.eclipse.jdt.core.prefs
+.settings/
 .vscode
 .project
 .checkstyle
@@ -12,3 +10,7 @@ SQLancer.iml
 dependency-reduced-pom.xml
 database0.db
 databaseconnectiontest.db
+database*.log
+database*.properties
+database*.script
+databases/

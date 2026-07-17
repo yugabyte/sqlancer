@@ -1,7 +1,6 @@
 package sqlancer.yugabyte.ycql;
 
 import sqlancer.common.ast.newast.NewToStringVisitor;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.yugabyte.ycql.ast.YCQLConstant;
 import sqlancer.yugabyte.ycql.ast.YCQLExpression;
 import sqlancer.yugabyte.ycql.ast.YCQLSelect;
@@ -9,7 +8,7 @@ import sqlancer.yugabyte.ycql.ast.YCQLSelect;
 public class YCQLToStringVisitor extends NewToStringVisitor<YCQLExpression> {
 
     @Override
-    public void visitSpecific(Node<YCQLExpression> expr) {
+    public void visitSpecific(YCQLExpression expr) {
         if (expr instanceof YCQLConstant) {
             visit((YCQLConstant) expr);
         } else if (expr instanceof YCQLSelect) {
@@ -41,9 +40,9 @@ public class YCQLToStringVisitor extends NewToStringVisitor<YCQLExpression> {
             sb.append(" WHERE ");
             visit(select.getWhereClause());
         }
-        if (!select.getOrderByExpressions().isEmpty()) {
+        if (!select.getOrderByClauses().isEmpty()) {
             sb.append(" ORDER BY ");
-            visit(select.getOrderByExpressions());
+            visit(select.getOrderByClauses());
         }
         if (select.getLimitClause() != null) {
             sb.append(" LIMIT ");
@@ -53,12 +52,9 @@ public class YCQLToStringVisitor extends NewToStringVisitor<YCQLExpression> {
             sb.append(" OFFSET ");
             visit(select.getOffsetClause());
         }
-        if (select.isAllowFiltering()) {
-            sb.append(" ALLOW FILTERING");
-        }
     }
 
-    public static String asString(Node<YCQLExpression> expr) {
+    public static String asString(YCQLExpression expr) {
         YCQLToStringVisitor visitor = new YCQLToStringVisitor();
         visitor.visit(expr);
         return visitor.get();

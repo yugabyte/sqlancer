@@ -2,14 +2,23 @@ package sqlancer.mysql.gen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
+import sqlancer.common.gen.CERTGenerator;
+import sqlancer.common.gen.TLPWhereGenerator;
 import sqlancer.common.gen.UntypedExpressionGenerator;
+import sqlancer.common.schema.AbstractTables;
 import sqlancer.mysql.MySQLBugs;
 import sqlancer.mysql.MySQLGlobalState;
 import sqlancer.mysql.MySQLSchema.MySQLColumn;
 import sqlancer.mysql.MySQLSchema.MySQLRowValue;
+import sqlancer.mysql.MySQLSchema.MySQLTable;
+import sqlancer.mysql.ast.MySQLAggregate;
+import sqlancer.mysql.ast.MySQLAggregate.MySQLAggregateFunction;
 import sqlancer.mysql.ast.MySQLBetweenOperation;
 import sqlancer.mysql.ast.MySQLBinaryComparisonOperation;
 import sqlancer.mysql.ast.MySQLBinaryComparisonOperation.BinaryComparisonOperator;
@@ -17,6 +26,7 @@ import sqlancer.mysql.ast.MySQLBinaryLogicalOperation;
 import sqlancer.mysql.ast.MySQLBinaryLogicalOperation.MySQLBinaryLogicalOperator;
 import sqlancer.mysql.ast.MySQLBinaryOperation;
 import sqlancer.mysql.ast.MySQLBinaryOperation.MySQLBinaryOperator;
+import sqlancer.mysql.ast.MySQLCaseOperator;
 import sqlancer.mysql.ast.MySQLCastOperation;
 import sqlancer.mysql.ast.MySQLColumnReference;
 import sqlancer.mysql.ast.MySQLComputableFunction;
@@ -26,17 +36,23 @@ import sqlancer.mysql.ast.MySQLConstant.MySQLDoubleConstant;
 import sqlancer.mysql.ast.MySQLExists;
 import sqlancer.mysql.ast.MySQLExpression;
 import sqlancer.mysql.ast.MySQLInOperation;
+import sqlancer.mysql.ast.MySQLJoin;
 import sqlancer.mysql.ast.MySQLOrderByTerm;
 import sqlancer.mysql.ast.MySQLOrderByTerm.MySQLOrder;
+import sqlancer.mysql.ast.MySQLSelect;
 import sqlancer.mysql.ast.MySQLStringExpression;
+import sqlancer.mysql.ast.MySQLTableReference;
 import sqlancer.mysql.ast.MySQLUnaryPostfixOperation;
 import sqlancer.mysql.ast.MySQLUnaryPrefixOperation;
 import sqlancer.mysql.ast.MySQLUnaryPrefixOperation.MySQLUnaryPrefixOperator;
 
-public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLExpression, MySQLColumn> {
+public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLExpression, MySQLColumn>
+        implements TLPWhereGenerator<MySQLSelect, MySQLJoin, MySQLExpression, MySQLTable, MySQLColumn>,
+        CERTGenerator<MySQLSelect, MySQLJoin, MySQLExpression, MySQLTable, MySQLColumn> {
 
     private final MySQLGlobalState state;
     private MySQLRowValue rowVal;
+    private List<MySQLTable> tables;
 
     public MySQLExpressionGenerator(MySQLGlobalState state) {
         this.state = state;
@@ -49,7 +65,7 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
 
     private enum Actions {
         COLUMN, LITERAL, UNARY_PREFIX_OPERATION, UNARY_POSTFIX, COMPUTABLE_FUNCTION, BINARY_LOGICAL_OPERATOR,
-        BINARY_COMPARISON_OPERATION, CAST, IN_OPERATION, BINARY_OPERATION, EXISTS, BETWEEN_OPERATOR;
+        BINARY_COMPARISON_OPERATION, CAST, IN_OPERATION, BINARY_OPERATION, EXISTS, BETWEEN_OPERATOR, CASE_OPERATOR;
     }
 
     @Override
@@ -96,12 +112,16 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
         case EXISTS:
             return getExists();
         case BETWEEN_OPERATOR:
-            if (MySQLBugs.bug99181) {
+            if (MySQLBugs.bug99182) {
                 // TODO: there are a number of bugs that are triggered by the BETWEEN operator
                 throw new IgnoreMeException();
             }
             return new MySQLBetweenOperation(generateExpression(depth + 1), generateExpression(depth + 1),
                     generateExpression(depth + 1));
+        case CASE_OPERATOR:
+            int nr = Randomly.smallNumber() + 1;
+            return new MySQLCaseOperator(generateExpression(depth + 1), generateExpressions(nr, depth + 1),
+                    generateExpressions(nr, depth + 1), generateExpression(depth + 1));
         default:
             throw new AssertionError();
         }
@@ -198,4 +218,141 @@ public class MySQLExpressionGenerator extends UntypedExpressionGenerator<MySQLEx
         return newOrderBys;
     }
 
+    @Override
+    public MySQLExpressionGenerator setTablesAndColumns(AbstractTables<MySQLTable, MySQLColumn> tables) {
+        this.columns = tables.getColumns();
+        this.tables = tables.getTables();
+
+        return this;
+    }
+
+    @Override
+    public MySQLExpression generateBooleanExpression() {
+        return generateExpression();
+    }
+
+    @Override
+    public MySQLSelect generateSelect() {
+        return new MySQLSelect();
+    }
+
+    @Override
+    public List<MySQLJoin> getRandomJoinClauses() {
+        return List.of();
+    }
+
+    @Override
+    public List<MySQLExpression> getTableRefs() {
+        return tables.stream().map(t -> new MySQLTableReference(t)).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MySQLExpression> generateFetchColumns(boolean shouldCreateDummy) {
+        return columns.stream().map(c -> new MySQLColumnReference(c, null)).collect(Collectors.toList());
+    }
+
+    @Override
+    public String generateExplainQuery(MySQLSelect select) {
+        return "EXPLAIN FORMAT=TRADITIONAL " + select.asString(); // as of MySQL 9.5.0, default EXPLAIN format changed
+                                                                  // from TRADITIONAL to TREE, hence TRADITIONAL must
+                                                                  // now be specified
+    }
+
+    public MySQLAggregate generateAggregate() {
+        MySQLAggregateFunction func = Randomly.fromOptions(MySQLAggregateFunction.values());
+
+        if (func.isVariadic()) {
+            int nrExprs = Randomly.smallNumber() + 1;
+            List<MySQLExpression> exprs = IntStream.range(0, nrExprs).mapToObj(index -> generateExpression())
+                    .collect(Collectors.toList());
+
+            return new MySQLAggregate(exprs, func);
+        } else {
+            return new MySQLAggregate(List.of(generateExpression()), func);
+        }
+    }
+
+    @Override
+    public boolean mutate(MySQLSelect select) {
+        List<Function<MySQLSelect, Boolean>> mutators = new ArrayList<>();
+
+        mutators.add(this::mutateWhere);
+        mutators.add(this::mutateGroupBy);
+        mutators.add(this::mutateHaving);
+        mutators.add(this::mutateAnd);
+        mutators.add(this::mutateOr);
+        mutators.add(this::mutateDistinct);
+
+        return Randomly.fromList(mutators).apply(select);
+    }
+
+    boolean mutateDistinct(MySQLSelect select) {
+        MySQLSelect.SelectType selectType = select.getFromOptions();
+        if (selectType != MySQLSelect.SelectType.ALL) {
+            select.setSelectType(MySQLSelect.SelectType.ALL);
+            return true;
+        } else {
+            select.setSelectType(MySQLSelect.SelectType.DISTINCT);
+            return false;
+        }
+    }
+
+    boolean mutateWhere(MySQLSelect select) {
+        boolean increase = select.getWhereClause() != null;
+        if (increase) {
+            select.setWhereClause(null);
+        } else {
+            select.setWhereClause(generateExpression());
+        }
+        return increase;
+    }
+
+    boolean mutateGroupBy(MySQLSelect select) {
+        boolean increase = !select.getGroupByExpressions().isEmpty();
+        if (increase) {
+            select.clearGroupByExpressions();
+        } else {
+            select.setGroupByExpressions(select.getFetchColumns());
+        }
+        return increase;
+    }
+
+    boolean mutateHaving(MySQLSelect select) {
+        if (select.getGroupByExpressions().isEmpty()) {
+            select.setGroupByExpressions(select.getFetchColumns());
+            select.setHavingClause(generateExpression());
+            return false;
+        } else {
+            if (select.getHavingClause() == null) {
+                select.setHavingClause(generateExpression());
+                return false;
+            } else {
+                select.setHavingClause(null);
+                return true;
+            }
+        }
+    }
+
+    boolean mutateAnd(MySQLSelect select) {
+        if (select.getWhereClause() == null) {
+            select.setWhereClause(generateExpression());
+        } else {
+            MySQLExpression newWhere = new MySQLBinaryLogicalOperation(select.getWhereClause(), generateExpression(),
+                    MySQLBinaryLogicalOperator.AND);
+            select.setWhereClause(newWhere);
+        }
+        return false;
+    }
+
+    boolean mutateOr(MySQLSelect select) {
+        if (select.getWhereClause() == null) {
+            select.setWhereClause(generateExpression());
+            return false;
+        } else {
+            MySQLExpression newWhere = new MySQLBinaryLogicalOperation(select.getWhereClause(), generateExpression(),
+                    MySQLBinaryLogicalOperator.OR);
+            select.setWhereClause(newWhere);
+            return true;
+        }
+    }
 }

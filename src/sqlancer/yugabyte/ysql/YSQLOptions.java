@@ -20,6 +20,7 @@ import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLPivotedQuerySynthesisOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLScanGUCOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPAggregateOracle;
+import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPDistinctOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPHavingOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPWhereOracle;
 
@@ -129,6 +130,12 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLTLPAggregateOracle(globalState);
+            }
+        },
+        DISTINCT {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLTLPDistinctOracle(globalState);
             }
         }
 

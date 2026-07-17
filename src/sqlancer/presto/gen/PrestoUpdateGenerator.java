@@ -3,7 +3,6 @@ package sqlancer.presto.gen;
 import java.util.List;
 
 import sqlancer.Randomly;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.common.gen.AbstractUpdateGenerator;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.presto.PrestoErrors;
@@ -20,13 +19,15 @@ public final class PrestoUpdateGenerator extends AbstractUpdateGenerator<PrestoC
 
     private PrestoUpdateGenerator(PrestoGlobalState globalState) {
         this.globalState = globalState;
+        this.canonicalizeString = false;
     }
 
     public static SQLQueryAdapter getQuery(PrestoGlobalState globalState) {
-        return new PrestoUpdateGenerator(globalState).generate();
+        return new PrestoUpdateGenerator(globalState).getStatement();
     }
 
-    private SQLQueryAdapter generate() {
+    @Override
+    public void buildStatement() {
         PrestoTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
         List<PrestoColumn> columns = table.getRandomNonEmptyColumnSubset();
         gen = new PrestoTypedExpressionGenerator(globalState).setColumns(table.getColumns());
@@ -35,12 +36,11 @@ public final class PrestoUpdateGenerator extends AbstractUpdateGenerator<PrestoC
         sb.append(" SET ");
         updateColumns(columns);
         PrestoErrors.addInsertErrors(errors);
-        return new SQLQueryAdapter(sb.toString(), errors, false, false);
     }
 
     @Override
     protected void updateValue(PrestoColumn column) {
-        Node<PrestoExpression> expr;
+        PrestoExpression expr;
         if (Randomly.getBooleanWithSmallProbability()) {
             expr = gen.generateExpression(column.getType());
             PrestoErrors.addExpressionErrors(errors);

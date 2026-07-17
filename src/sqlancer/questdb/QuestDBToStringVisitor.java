@@ -1,7 +1,6 @@
 package sqlancer.questdb;
 
 import sqlancer.common.ast.newast.NewToStringVisitor;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.questdb.ast.QuestDBConstant;
 import sqlancer.questdb.ast.QuestDBExpression;
 import sqlancer.questdb.ast.QuestDBSelect;
@@ -9,7 +8,7 @@ import sqlancer.questdb.ast.QuestDBSelect;
 public class QuestDBToStringVisitor extends NewToStringVisitor<QuestDBExpression> {
 
     @Override
-    public void visitSpecific(Node<QuestDBExpression> expr) {
+    public void visitSpecific(QuestDBExpression expr) {
         if (expr instanceof QuestDBConstant) {
             visit((QuestDBConstant) expr);
         } else if (expr instanceof QuestDBSelect) {
@@ -49,9 +48,9 @@ public class QuestDBToStringVisitor extends NewToStringVisitor<QuestDBExpression
         // sb.append(" HAVING ");
         // visit(select.getHavingClause());
         // }
-        // if (!select.getOrderByExpressions().isEmpty()) {
+        // if (!select.getOrderByClauses().isEmpty()) {
         // sb.append(" ORDER BY ");
-        // visit(select.getOrderByExpressions());
+        // visit(select.getOrderByClauses());
         // }
         if (select.getLimitClause() != null) {
             sb.append(" LIMIT ");
@@ -59,7 +58,7 @@ public class QuestDBToStringVisitor extends NewToStringVisitor<QuestDBExpression
         }
     }
 
-    public static String asString(Node<QuestDBExpression> expr) {
+    public static String asString(QuestDBExpression expr) {
         QuestDBToStringVisitor visitor = new QuestDBToStringVisitor();
         visitor.visit(expr);
         return visitor.get();

@@ -69,7 +69,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
      * Global lock for database creation - YugabyteDB cannot create multiple databases simultaneously due to catalog
      * version conflicts across the distributed system.
      */
-    private static final Object DATABASE_CREATION_LOCK = new Object();
+    public static final Object DATABASE_CREATION_LOCK = new Object();
 
     /**
      * Safety delay (in ms) before and after database creation to allow catalog changes to propagate.

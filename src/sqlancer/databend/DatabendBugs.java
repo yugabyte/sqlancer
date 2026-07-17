@@ -15,6 +15,11 @@ public final class DatabendBugs {
     public static boolean bug9236 = true; // https://github.com/datafuselabs/databend/issues/9236
     public static boolean bug9264 = true; // https://github.com/datafuselabs/databend/issues/9264
     public static boolean bug9806 = true; // https://github.com/datafuselabs/databend/issues/9806
+    public static boolean bug15568 = true; // https://github.com/datafuselabs/databend/issues/15568
+    public static boolean bug15569 = true; // https://github.com/datafuselabs/databend/issues/15569
+    public static boolean bug15570 = true; // https://github.com/datafuselabs/databend/issues/15570
+    public static boolean bug15572 = true; // https://github.com/datafuselabs/databend/issues/15572
+    public static boolean bug19773 = true; // https://github.com/databendlabs/databend/issues/19773
 
     private DatabendBugs() {
     }

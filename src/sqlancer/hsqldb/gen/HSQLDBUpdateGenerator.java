@@ -3,7 +3,6 @@ package sqlancer.hsqldb.gen;
 import java.util.List;
 
 import sqlancer.Randomly;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.common.gen.AbstractUpdateGenerator;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.hsqldb.HSQLDBErrors;
@@ -25,10 +24,11 @@ public final class HSQLDBUpdateGenerator extends AbstractUpdateGenerator<HSQLDBC
     }
 
     public static SQLQueryAdapter getQuery(HSQLDBProvider.HSQLDBGlobalState globalState) {
-        return new HSQLDBUpdateGenerator(globalState).generate();
+        return new HSQLDBUpdateGenerator(globalState).getStatement();
     }
 
-    private SQLQueryAdapter generate() {
+    @Override
+    public void buildStatement() {
         HSQLDBSchema.HSQLDBTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
         List<HSQLDBSchema.HSQLDBColumn> columns = table.getRandomNonEmptyColumnSubset();
         gen = new HSQLDBExpressionGenerator(globalState).setColumns(table.getColumns());
@@ -37,18 +37,16 @@ public final class HSQLDBUpdateGenerator extends AbstractUpdateGenerator<HSQLDBC
         sb.append(" SET ");
         updateColumns(columns);
         if (Randomly.getBooleanWithSmallProbability()) {
-            sb.append(" WHERE ");
-            sb.append(HSQLDBToStringVisitor.asString(
+            appendWhereClause(HSQLDBToStringVisitor.asString(
                     gen.generateExpression(HSQLDBCompositeDataType.getRandomWithType(HSQLDBDataType.BOOLEAN))));
             errors.add("data type of expression is not boolean");
             HSQLDBErrors.addExpressionErrors(errors);
         }
-        return new SQLQueryAdapter(sb.toString(), errors);
     }
 
     @Override
     protected void updateValue(HSQLDBColumn column) {
-        Node<HSQLDBExpression> expr;
+        HSQLDBExpression expr;
         expr = gen.generateConstant(column.getType());
         sb.append(HSQLDBToStringVisitor.asString(expr));
     }

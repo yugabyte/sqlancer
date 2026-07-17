@@ -51,8 +51,13 @@ public class MariaDBSchema extends AbstractSchema<MariaDBGlobalState, MariaDBTab
             return precision;
         }
 
+        @Override
         public boolean isPrimaryKey() {
             return isPrimaryKey;
+        }
+
+        public static MariaDBColumn createDummy(String name) {
+            return new MariaDBColumn(name, MariaDBDataType.INT, false, 1);
         }
 
     }
@@ -240,6 +245,10 @@ public class MariaDBSchema extends AbstractSchema<MariaDBGlobalState, MariaDBTab
 
     public MariaDBSchema(List<MariaDBTable> databaseTables) {
         super(databaseTables);
+    }
+
+    public MariaDBTables getRandomTableNonEmptyTables() {
+        return new MariaDBTables(Randomly.nonEmptySubset(getDatabaseTables()));
     }
 
 }

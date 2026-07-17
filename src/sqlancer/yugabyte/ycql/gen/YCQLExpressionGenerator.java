@@ -10,42 +10,36 @@ import java.util.List;
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.common.ast.BinaryOperatorNode.Operator;
-import sqlancer.common.ast.newast.ColumnReferenceNode;
-import sqlancer.common.ast.newast.NewBetweenOperatorNode;
-import sqlancer.common.ast.newast.NewBinaryOperatorNode;
-import sqlancer.common.ast.newast.NewFunctionNode;
-import sqlancer.common.ast.newast.NewInOperatorNode;
-import sqlancer.common.ast.newast.NewOrderingTerm;
 import sqlancer.common.ast.newast.NewOrderingTerm.Ordering;
-import sqlancer.common.ast.newast.NewUnaryPostfixOperatorNode;
-import sqlancer.common.ast.newast.NewUnaryPrefixOperatorNode;
-import sqlancer.common.ast.newast.Node;
 import sqlancer.common.gen.UntypedExpressionGenerator;
 import sqlancer.yugabyte.ycql.YCQLProvider.YCQLGlobalState;
 import sqlancer.yugabyte.ycql.YCQLSchema.YCQLColumn;
 import sqlancer.yugabyte.ycql.YCQLSchema.YCQLDataType;
+import sqlancer.yugabyte.ycql.ast.YCQLBetweenOperation;
+import sqlancer.yugabyte.ycql.ast.YCQLBinaryOperation;
+import sqlancer.yugabyte.ycql.ast.YCQLColumnReference;
 import sqlancer.yugabyte.ycql.ast.YCQLConstant;
 import sqlancer.yugabyte.ycql.ast.YCQLExpression;
+import sqlancer.yugabyte.ycql.ast.YCQLFunction;
+import sqlancer.yugabyte.ycql.ast.YCQLInOperation;
+import sqlancer.yugabyte.ycql.ast.YCQLOrderingTerm;
+import sqlancer.yugabyte.ycql.ast.YCQLUnaryPostfixOperation;
+import sqlancer.yugabyte.ycql.ast.YCQLUnaryPrefixOperation;
 
-public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<Node<YCQLExpression>, YCQLColumn> {
+public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<YCQLExpression, YCQLColumn> {
 
     private final YCQLGlobalState globalState;
 
-    // When true, do not emit logical AND/OR operators - they are only legal in condition contexts (WHERE/IF) and
-    // crash the tserver when evaluated as values (see YugabyteBugs#bugYcqlLogicalInValueContext).
+    // When true, do not emit logical AND/OR - they are only legal in condition contexts (WHERE/IF) and crash the
+    // tserver when evaluated as values (see YugabyteBugs#bugYcqlLogicalInValueContext).
     private boolean valueContext;
 
     public YCQLExpressionGenerator(YCQLGlobalState globalState) {
         this.globalState = globalState;
     }
 
-    private enum Expression {
-        BINARY_COMPARISON, BINARY_LOGICAL, BINARY_ARITHMETIC, FUNC, BETWEEN, IN
-    }
-
-    // Generates an expression for a value context (SELECT projection, ORDER BY), where logical operators are
-    // illegal / crash-inducing. Restores the previous mode afterwards.
-    public Node<YCQLExpression> generateValueExpression() {
+    // Generates an expression for a value context (SELECT projection, ORDER BY), where logical operators are illegal.
+    public YCQLExpression generateValueExpression() {
         boolean previous = valueContext;
         valueContext = bugYcqlLogicalInValueContext;
         try {
@@ -55,7 +49,7 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
         }
     }
 
-    public List<Node<YCQLExpression>> generateValueOrderBys() {
+    public List<YCQLExpression> generateValueOrderBys() {
         boolean previous = valueContext;
         valueContext = bugYcqlLogicalInValueContext;
         try {
@@ -65,38 +59,19 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
         }
     }
 
-    // Generates a boolean condition suitable for a WHERE clause: one or more comparisons combined with AND/OR.
-    // Comparison operands are produced in value context so no logical operator lands in a value position.
-    @Override
-    public Node<YCQLExpression> generatePredicate() {
-        Node<YCQLExpression> condition = generateComparison();
-        while (Randomly.getBooleanWithRatherLowProbability()) {
-            condition = new NewBinaryOperatorNode<>(condition, generateComparison(),
-                    YCQLBinaryLogicalOperator.getRandom());
-        }
-        return condition;
-    }
-
-    private Node<YCQLExpression> generateComparison() {
-        boolean previous = valueContext;
-        valueContext = bugYcqlLogicalInValueContext;
-        try {
-            return new NewBinaryOperatorNode<YCQLExpression>(generateExpression(0), generateExpression(0),
-                    YCQLBinaryComparisonOperator.getRandom());
-        } finally {
-            valueContext = previous;
-        }
+    private enum Expression {
+        BINARY_COMPARISON, BINARY_LOGICAL, BINARY_ARITHMETIC, FUNC, BETWEEN, IN
     }
 
     @Override
-    protected Node<YCQLExpression> generateExpression(int depth) {
+    protected YCQLExpression generateExpression(int depth) {
         if (depth >= globalState.getOptions().getMaxExpressionDepth() || Randomly.getBoolean()) {
             return generateLeafNode();
         }
         if (allowAggregates && Randomly.getBoolean()) {
             YCQLAggregateFunction aggregate = YCQLAggregateFunction.getRandom();
             allowAggregates = false;
-            return new NewFunctionNode<>(generateExpressions(depth + 1, aggregate.getNrArgs()), aggregate);
+            return new YCQLFunction<>(generateExpressions(depth + 1, aggregate.getNrArgs()), aggregate);
         }
         List<Expression> possibleOptions = new ArrayList<>(Arrays.asList(Expression.values()));
         if (valueContext) {
@@ -106,23 +81,21 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
         switch (expr) {
         case BINARY_COMPARISON:
             Operator op = YCQLBinaryComparisonOperator.getRandom();
-            return new NewBinaryOperatorNode<YCQLExpression>(generateExpression(depth + 1),
-                    generateExpression(depth + 1), op);
+            return new YCQLBinaryOperation(generateExpression(depth + 1), generateExpression(depth + 1), op);
         case BINARY_LOGICAL:
             op = YCQLBinaryLogicalOperator.getRandom();
-            return new NewBinaryOperatorNode<YCQLExpression>(generateExpression(depth + 1),
-                    generateExpression(depth + 1), op);
+            return new YCQLBinaryOperation(generateExpression(depth + 1), generateExpression(depth + 1), op);
         case BINARY_ARITHMETIC:
-            return new NewBinaryOperatorNode<YCQLExpression>(generateExpression(depth + 1),
-                    generateExpression(depth + 1), YCQLBinaryArithmeticOperator.getRandom());
+            return new YCQLBinaryOperation(generateExpression(depth + 1), generateExpression(depth + 1),
+                    YCQLBinaryArithmeticOperator.getRandom());
         case FUNC:
             DBFunction func = DBFunction.getRandom();
-            return new NewFunctionNode<YCQLExpression, DBFunction>(generateExpressions(func.getNrArgs()), func);
+            return new YCQLFunction<DBFunction>(generateExpressions(func.getNrArgs()), func);
         case BETWEEN:
-            return new NewBetweenOperatorNode<YCQLExpression>(generateExpression(depth + 1),
-                    generateExpression(depth + 1), generateExpression(depth + 1), Randomly.getBoolean());
+            return new YCQLBetweenOperation(generateExpression(depth + 1), generateExpression(depth + 1),
+                    generateExpression(depth + 1), Randomly.getBoolean());
         case IN:
-            return new NewInOperatorNode<YCQLExpression>(generateExpression(depth + 1),
+            return new YCQLInOperation(generateExpression(depth + 1),
                     generateExpressions(depth + 1, Randomly.smallNumber() + 1), Randomly.getBoolean());
         default:
             throw new AssertionError(expr);
@@ -130,13 +103,13 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
     }
 
     @Override
-    protected Node<YCQLExpression> generateColumn() {
+    protected YCQLExpression generateColumn() {
         YCQLColumn column = Randomly.fromList(columns);
-        return new ColumnReferenceNode<YCQLExpression, YCQLColumn>(column);
+        return new YCQLColumnReference(column);
     }
 
     @Override
-    public Node<YCQLExpression> generateConstant() {
+    public YCQLExpression generateConstant() {
         if (Randomly.getBooleanWithSmallProbability()) {
             if (bug14330) {
                 throw new IgnoreMeException();
@@ -147,7 +120,7 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
         return generateConstantForType(YCQLDataType.getRandom());
     }
 
-    public Node<YCQLExpression> generateConstantForType(YCQLDataType type) {
+    public YCQLExpression generateConstantForType(YCQLDataType type) {
         switch (type) {
         case INT:
             return YCQLConstant.createIntConstant(globalState.getRandomly().getInteger());
@@ -167,12 +140,12 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
     }
 
     @Override
-    public List<Node<YCQLExpression>> generateOrderBys() {
-        List<Node<YCQLExpression>> expr = super.generateOrderBys();
-        List<Node<YCQLExpression>> newExpr = new ArrayList<>(expr.size());
-        for (Node<YCQLExpression> curExpr : expr) {
+    public List<YCQLExpression> generateOrderBys() {
+        List<YCQLExpression> expr = super.generateOrderBys();
+        List<YCQLExpression> newExpr = new ArrayList<>(expr.size());
+        for (YCQLExpression curExpr : expr) {
             if (Randomly.getBoolean()) {
-                curExpr = new NewOrderingTerm<>(curExpr, Ordering.getRandom());
+                curExpr = new YCQLOrderingTerm(curExpr, Ordering.getRandom());
             }
             newExpr.add(curExpr);
         }
@@ -336,25 +309,24 @@ public final class YCQLExpressionGenerator extends UntypedExpressionGenerator<No
 
     }
 
-    public NewFunctionNode<YCQLExpression, YCQLAggregateFunction> generateArgsForAggregate(
-            YCQLAggregateFunction aggregateFunction) {
-        return new NewFunctionNode<YCQLExpression, YCQLAggregateFunction>(
-                generateExpressions(aggregateFunction.getNrArgs()), aggregateFunction);
+    public YCQLFunction<YCQLAggregateFunction> generateArgsForAggregate(YCQLAggregateFunction aggregateFunction) {
+        return new YCQLFunction<YCQLAggregateFunction>(generateExpressions(aggregateFunction.getNrArgs()),
+                aggregateFunction);
     }
 
-    public Node<YCQLExpression> generateAggregate() {
+    public YCQLExpression generateAggregate() {
         YCQLAggregateFunction aggrFunc = YCQLAggregateFunction.getRandom();
         return generateArgsForAggregate(aggrFunc);
     }
 
     @Override
-    public Node<YCQLExpression> negatePredicate(Node<YCQLExpression> predicate) {
-        return new NewUnaryPrefixOperatorNode<>(predicate, YCQLUnaryPrefixOperator.NOT);
+    public YCQLExpression negatePredicate(YCQLExpression predicate) {
+        return new YCQLUnaryPrefixOperation(predicate, YCQLUnaryPrefixOperator.NOT);
     }
 
     @Override
-    public Node<YCQLExpression> isNull(Node<YCQLExpression> expr) {
-        return new NewUnaryPostfixOperatorNode<>(expr, YCQLUnaryPostfixOperator.IS_NULL);
+    public YCQLExpression isNull(YCQLExpression expr) {
+        return new YCQLUnaryPostfixOperation(expr, YCQLUnaryPostfixOperator.IS_NULL);
     }
 
 }

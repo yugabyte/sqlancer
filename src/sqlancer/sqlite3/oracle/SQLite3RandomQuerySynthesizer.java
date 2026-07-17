@@ -37,10 +37,11 @@ public final class SQLite3RandomQuerySynthesizer {
         SQLite3Tables targetTables = s.getRandomTableNonEmptyTables();
         List<SQLite3Expression> expressions = new ArrayList<>();
         SQLite3ExpressionGenerator gen = new SQLite3ExpressionGenerator(globalState)
-                .setColumns(s.getTables().getColumns());
-        SQLite3ExpressionGenerator whereClauseGen = new SQLite3ExpressionGenerator(globalState);
+                .setColumns(targetTables.getColumns());
+        SQLite3ExpressionGenerator whereClauseGen = new SQLite3ExpressionGenerator(globalState)
+                .setColumns(targetTables.getColumns());
         SQLite3ExpressionGenerator aggregateGen = new SQLite3ExpressionGenerator(globalState)
-                .setColumns(s.getTables().getColumns()).allowAggregateFunctions();
+                .setColumns(targetTables.getColumns()).allowAggregateFunctions();
 
         // SELECT
         SQLite3Select select = new SQLite3Select();
@@ -102,7 +103,8 @@ public final class SQLite3RandomQuerySynthesizer {
         select.setFromList(SQLite3Common.getTableRefs(tables, s));
         // TODO: no values are referenced from this sub query yet
         // if (Randomly.getBooleanWithSmallProbability()) {
-        // select.getFromList().add(SQLite3RandomQuerySynthesizer.generate(globalState, Randomly.smallNumber() + 1));
+        // select.getFromList().add(SQLite3RandomQuerySynthesizer.generate(globalState,
+        // Randomly.smallNumber() + 1));
         // }
 
         // WHERE
@@ -121,7 +123,7 @@ public final class SQLite3RandomQuerySynthesizer {
         boolean orderBy = Randomly.getBooleanWithRatherLowProbability();
         if (orderBy) {
             // ORDER BY
-            select.setOrderByExpressions(gen.generateOrderBys());
+            select.setOrderByClauses(gen.generateOrderBys());
         }
         if (Randomly.getBooleanWithRatherLowProbability()) {
             // LIMIT

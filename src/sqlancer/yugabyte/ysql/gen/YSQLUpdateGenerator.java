@@ -30,10 +30,13 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
     }
 
     public static SQLQueryAdapter create(YSQLGlobalState globalState) {
-        return new YSQLUpdateGenerator(globalState).generate();
+        YSQLUpdateGenerator generator = new YSQLUpdateGenerator(globalState);
+        generator.buildStatement();
+        return new SQLQueryAdapter(generator.sb.toString(), generator.errors, true);
     }
 
-    private SQLQueryAdapter generate() {
+    @Override
+    public void buildStatement() {
         randomTable = globalState.getSchema().getRandomTable(YSQLTable::isInsertable);
         List<YSQLColumn> columns = randomTable.getRandomNonEmptyColumnSubset();
         sb.append("UPDATE ");
@@ -59,8 +62,6 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
                     YSQLDataType.BOOLEAN);
             sb.append(YSQLVisitor.asString(where));
         }
-
-        return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 
     @Override

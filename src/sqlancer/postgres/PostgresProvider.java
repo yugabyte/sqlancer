@@ -1,13 +1,21 @@
 package sqlancer.postgres;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.auto.service.AutoService;
 
 import sqlancer.AbstractAction;
@@ -22,7 +30,6 @@ import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
 import sqlancer.common.query.SQLancerResultSet;
-import sqlancer.postgres.PostgresOptions.PostgresOracleFactory;
 import sqlancer.postgres.gen.PostgresAlterTableGenerator;
 import sqlancer.postgres.gen.PostgresAnalyzeGenerator;
 import sqlancer.postgres.gen.PostgresClusterGenerator;
@@ -30,6 +37,7 @@ import sqlancer.postgres.gen.PostgresCommentGenerator;
 import sqlancer.postgres.gen.PostgresDeleteGenerator;
 import sqlancer.postgres.gen.PostgresDiscardGenerator;
 import sqlancer.postgres.gen.PostgresDropIndexGenerator;
+import sqlancer.postgres.gen.PostgresExplainGenerator;
 import sqlancer.postgres.gen.PostgresIndexGenerator;
 import sqlancer.postgres.gen.PostgresInsertGenerator;
 import sqlancer.postgres.gen.PostgresNotifyGenerator;
@@ -38,6 +46,7 @@ import sqlancer.postgres.gen.PostgresSequenceGenerator;
 import sqlancer.postgres.gen.PostgresSetGenerator;
 import sqlancer.postgres.gen.PostgresStatisticsGenerator;
 import sqlancer.postgres.gen.PostgresTableGenerator;
+import sqlancer.postgres.gen.PostgresTableSpaceGenerator;
 import sqlancer.postgres.gen.PostgresTransactionGenerator;
 import sqlancer.postgres.gen.PostgresTruncateGenerator;
 import sqlancer.postgres.gen.PostgresUpdateGenerator;
@@ -91,6 +100,7 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
         }), //
         CREATE_STATISTICS(PostgresStatisticsGenerator::insert), //
         DROP_STATISTICS(PostgresStatisticsGenerator::remove), //
+        ALTER_STATISTICS(PostgresStatisticsGenerator::alter), //
         DELETE(PostgresDeleteGenerator::create), //
         DISCARD(PostgresDiscardGenerator::create), //
         DROP_INDEX(PostgresDropIndexGenerator::create), //
@@ -110,14 +120,16 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
         RESET_ROLE((g) -> new SQLQueryAdapter("RESET ROLE")), //
         COMMENT_ON(PostgresCommentGenerator::generate), //
         RESET((g) -> new SQLQueryAdapter("RESET ALL") /*
-                                                       * https://www.postgresql.org/docs/devel/sql-reset.html TODO: also
+                                                       * https://www.postgresql.org/docs/13/sql-reset.html TODO: also
                                                        * configuration parameter
                                                        */), //
         NOTIFY(PostgresNotifyGenerator::createNotify), //
         LISTEN((g) -> PostgresNotifyGenerator.createListen()), //
         UNLISTEN((g) -> PostgresNotifyGenerator.createUnlisten()), //
         CREATE_SEQUENCE(PostgresSequenceGenerator::createSequence), //
-        CREATE_VIEW(PostgresViewGenerator::create);
+        EXPLAIN(PostgresExplainGenerator::create), //
+        CREATE_VIEW(PostgresViewGenerator::create), //
+        CREATE_TABLESPACE(PostgresTableSpaceGenerator::generate);
 
         private final SQLQueryProvider<PostgresGlobalState> sqlQueryProvider;
 
@@ -141,6 +153,9 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
             break;
         case CREATE_STATISTICS:
             nrPerformed = r.getInteger(0, 5);
+            break;
+        case ALTER_STATISTICS:
+            nrPerformed = r.getInteger(0, 2);
             break;
         case DISCARD:
         case DROP_INDEX:
@@ -178,11 +193,17 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
         case CREATE_VIEW:
             nrPerformed = r.getInteger(0, 2);
             break;
+        case CREATE_TABLESPACE:
+            nrPerformed = r.getInteger(0, 2);
+            break;
         case UPDATE:
             nrPerformed = r.getInteger(0, 10);
             break;
         case INSERT:
             nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+            break;
+        case EXPLAIN:
+            nrPerformed = r.getInteger(0, 1);
             break;
         default:
             throw new AssertionError(a);
@@ -267,12 +288,33 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
         }
         Connection con = DriverManager.getConnection("jdbc:" + entryURL, username, password);
         globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
-        globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
-        createDatabaseCommand = getCreateDatabaseCommand(globalState);
-        globalState.getState().logStatement(createDatabaseCommand);
-        try (Statement s = con.createStatement()) {
-            s.execute("DROP DATABASE IF EXISTS " + databaseName);
+
+        String dropCommand = "DROP DATABASE";
+        boolean forceDrop = Randomly.getBoolean();
+        if (forceDrop) {
+            dropCommand += " FORCE";
         }
+        dropCommand += " IF EXISTS " + databaseName;
+
+        globalState.getState().logStatement(dropCommand + ";");
+        try (Statement s = con.createStatement()) {
+            s.execute(dropCommand);
+        } catch (SQLException e) {
+            // If force fails, fall back to regular drop
+            if (forceDrop) {
+                String fallbackDrop = "DROP DATABASE IF EXISTS " + databaseName;
+                globalState.getState().logStatement(fallbackDrop + ";");
+                try (Statement s = con.createStatement()) {
+                    s.execute(fallbackDrop);
+                }
+            } else {
+                throw e;
+            }
+        }
+
+        // Create database section
+        createDatabaseCommand = getCreateDatabaseCommand(globalState);
+        globalState.getState().logStatement(createDatabaseCommand + ";");
         try (Statement s = con.createStatement()) {
             s.execute(createDatabaseCommand);
         }
@@ -332,9 +374,13 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
                     sb.append(Randomly.fromOptions("utf8"));
                     sb.append("' ");
                 }
-                for (String lc : Arrays.asList("LC_COLLATE", "LC_CTYPE")) {
-                    if (!state.getCollates().isEmpty() && Randomly.getBoolean()) {
-                        sb.append(String.format(" %s = '%s'", lc, Randomly.fromList(state.getCollates())));
+                if (Randomly.getBoolean() && !state.getCollates().isEmpty()) {
+                    sb.append(String.format(" LOCALE = '%s' ", Randomly.fromList(state.getCollates())));
+                } else {
+                    for (String lc : Arrays.asList("LC_COLLATE", "LC_CTYPE")) {
+                        if (!state.getCollates().isEmpty() && Randomly.getBoolean()) {
+                            sb.append(String.format(" %s = '%s'", lc, Randomly.fromList(state.getCollates())));
+                        }
                     }
                 }
                 sb.append(" TEMPLATE template0");
@@ -348,6 +394,77 @@ public class PostgresProvider extends SQLProviderAdapter<PostgresGlobalState, Po
     @Override
     public String getDBMSName() {
         return "postgres";
+    }
+
+    @Override
+    public String getQueryPlan(String selectStr, PostgresGlobalState globalState) throws Exception {
+        String queryPlan = "";
+        if (globalState.getOptions().logEachSelect()) {
+            globalState.getLogger().writeCurrent(selectStr);
+            try {
+                globalState.getLogger().getCurrentFileWriter().flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        SQLQueryAdapter q = new SQLQueryAdapter(PostgresExplainGenerator.explain(selectStr), null);
+        try (SQLancerResultSet rs = q.executeAndGet(globalState)) {
+            while (rs.next()) {
+                queryPlan += rs.getString(1);
+            }
+        } catch (SQLException | AssertionError e) {
+            queryPlan = "";
+        }
+        return formatQueryPlan(queryPlan);
+    }
+
+    @Override
+    protected double[] initializeWeightedAverageReward() {
+        return new double[PostgresProvider.Action.values().length];
+    }
+
+    @Override
+    protected void executeMutator(int index, PostgresGlobalState globalState) throws Exception {
+        SQLQueryAdapter queryMutateTable = PostgresProvider.Action.values()[index].getQuery(globalState);
+        globalState.executeStatement(queryMutateTable);
+    }
+
+    @Override
+    protected boolean addRowsToAllTables(PostgresGlobalState globalState) throws Exception {
+        List<PostgresSchema.PostgresTable> tablesNoRow = globalState.getSchema().getDatabaseTables().stream()
+                .filter(t -> t.getNrRows(globalState) == 0).collect(Collectors.toList());
+        for (PostgresSchema.PostgresTable table : tablesNoRow) {
+            SQLQueryAdapter queryAddRows = PostgresInsertGenerator.insertRows(globalState, table);
+            globalState.executeStatement(queryAddRows);
+        }
+        return true;
+    }
+
+    public String formatQueryPlan(String queryPlan) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(queryPlan).get(0).get("Plan");
+        // Extract nodes using BFS algorithm
+        List<String> nodeTypes = extractNodeTypesIterative(root);
+        return String.join(" ", nodeTypes);
+    }
+
+    // BFS algorithm for traversing the Json Query Plan
+    private static List<String> extractNodeTypesIterative(JsonNode root) {
+        List<String> result = new ArrayList<>();
+        Queue<JsonNode> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            JsonNode node = queue.poll();
+            if (node.has("Node Type")) {
+                result.add(node.get("Node Type").asText());
+            }
+            if (node.has("Plans") && node.get("Plans").isArray()) {
+                for (JsonNode plan : node.get("Plans")) {
+                    queue.add(plan);
+                }
+            }
+        }
+        return result;
     }
 
 }

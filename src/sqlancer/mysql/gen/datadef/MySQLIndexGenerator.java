@@ -5,6 +5,7 @@ import java.util.List;
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.mysql.MySQLBugs;
 import sqlancer.mysql.MySQLErrors;
 import sqlancer.mysql.MySQLGlobalState;
 import sqlancer.mysql.MySQLSchema;
@@ -78,7 +79,11 @@ public class MySQLIndexGenerator {
                 if (Randomly.getBoolean() && c.getType() == MySQLDataType.VARCHAR) {
                     sb.append("(");
                     // TODO for string
-                    sb.append(r.getInteger(1, 5));
+                    if (MySQLBugs.bug114534) {
+                        sb.append(r.getInteger(2, 5));
+                    } else {
+                        sb.append(r.getInteger(1, 5));
+                    }
                     sb.append(")");
                 }
                 if (Randomly.getBoolean()) {
@@ -115,6 +120,8 @@ public class MySQLIndexGenerator {
         errors.add("Data truncated for functional index");
         errors.add("used in key specification without a key length");
         errors.add("Row size too large"); // seems to happen together with MIN_ROWS in the table declaration
+        errors.add("in the PARTITION BY KEY() clause is not supported"); // prefix key parts disallowed on
+                                                                         // KEY-partitioned columns
         return new SQLQueryAdapter(string, errors, true);
     }
 

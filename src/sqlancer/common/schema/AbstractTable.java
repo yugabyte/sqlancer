@@ -83,12 +83,20 @@ public abstract class AbstractTable<C extends AbstractTableColumn<?, ?>, I exten
         return Randomly.nonEmptySubset(getColumns());
     }
 
+    public List<C> getRandomNonEmptyColumnSubsetFilter(Predicate<C> predicate) {
+        return Randomly.nonEmptySubset(getColumns().stream().filter(predicate).collect(Collectors.toList()));
+    }
+
     public List<C> getRandomNonEmptyColumnSubset(int size) {
         return Randomly.nonEmptySubset(getColumns(), size);
     }
 
     public boolean isView() {
         return isView;
+    }
+
+    public boolean hasPrimaryKey() {
+        return columns.stream().anyMatch(c -> c.isPrimaryKey());
     }
 
     public String getFreeColumnName() {

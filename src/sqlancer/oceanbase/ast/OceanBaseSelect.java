@@ -5,8 +5,13 @@ import java.util.Collections;
 import java.util.List;
 
 import sqlancer.common.ast.SelectBase;
+import sqlancer.common.ast.newast.Select;
+import sqlancer.oceanbase.OceanBaseSchema.OceanBaseColumn;
+import sqlancer.oceanbase.OceanBaseSchema.OceanBaseTable;
+import sqlancer.oceanbase.OceanBaseVisitor;
 
-public class OceanBaseSelect extends SelectBase<OceanBaseExpression> implements OceanBaseExpression {
+public class OceanBaseSelect extends SelectBase<OceanBaseExpression>
+        implements OceanBaseExpression, Select<OceanBaseJoin, OceanBaseExpression, OceanBaseTable, OceanBaseColumn> {
 
     private SelectType fromOptions = SelectType.ALL;
     private List<String> modifiers = Collections.emptyList();
@@ -29,10 +34,12 @@ public class OceanBaseSelect extends SelectBase<OceanBaseExpression> implements 
         this.fromOptions = fromOptions;
     }
 
+    @Override
     public void setGroupByClause(List<OceanBaseExpression> groupBys) {
         this.groupBys = groupBys;
     }
 
+    @Override
     public List<OceanBaseExpression> getGroupByClause() {
         return this.groupBys;
     }
@@ -56,6 +63,20 @@ public class OceanBaseSelect extends SelectBase<OceanBaseExpression> implements 
 
     public OceanBaseStringExpression getHint() {
         return hint;
+    }
+
+    @Override
+    public void setJoinClauses(List<OceanBaseJoin> joinStatements) {
+    }
+
+    @Override
+    public List<OceanBaseJoin> getJoinClauses() {
+        return List.of();
+    }
+
+    @Override
+    public String asString() {
+        return OceanBaseVisitor.asString(this);
     }
 
 }

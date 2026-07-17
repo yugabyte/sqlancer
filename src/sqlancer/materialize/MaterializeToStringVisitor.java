@@ -139,7 +139,7 @@ public final class MaterializeToStringVisitor extends ToStringVisitor<Materializ
             sb.append(" WHERE ");
             visit(s.getWhereClause());
         }
-        if (s.getGroupByExpressions().size() > 0) {
+        if (!s.getGroupByExpressions().isEmpty()) {
             sb.append(" GROUP BY ");
             visit(s.getGroupByExpressions());
         }
@@ -148,9 +148,9 @@ public final class MaterializeToStringVisitor extends ToStringVisitor<Materializ
             visit(s.getHavingClause());
 
         }
-        if (!s.getOrderByExpressions().isEmpty()) {
+        if (!s.getOrderByClauses().isEmpty()) {
             sb.append(" ORDER BY ");
-            visit(s.getOrderByExpressions());
+            visit(s.getOrderByClauses());
         }
         if (s.getLimitClause() != null) {
             sb.append(" LIMIT ");

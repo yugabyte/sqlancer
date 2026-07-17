@@ -21,7 +21,6 @@ import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
-import sqlancer.mysql.MySQLOptions.MySQLOracleFactory;
 import sqlancer.mysql.MySQLSchema.MySQLColumn;
 import sqlancer.mysql.MySQLSchema.MySQLTable;
 import sqlancer.mysql.gen.MySQLAlterTable;
@@ -63,11 +62,6 @@ public class MySQLProvider extends SQLProviderAdapter<MySQLGlobalState, MySQLOpt
         SELECT_INFO((g) -> new SQLQueryAdapter(
                 "select TABLE_NAME, ENGINE from information_schema.TABLES where table_schema = '" + g.getDatabaseName()
                         + "'")), //
-        CREATE_TABLE((g) -> {
-            // TODO refactor
-            String tableName = DBMSCommon.createTableName(g.getSchema().getDatabaseTables().size());
-            return MySQLTableGenerator.generate(g, tableName);
-        }), //
         UPDATE(MySQLUpdateGenerator::create), //
         DELETE(MySQLDeleteGenerator::delete), //
         DROP_INDEX(MySQLDropIndex::generate);
@@ -92,9 +86,6 @@ public class MySQLProvider extends SQLProviderAdapter<MySQLGlobalState, MySQLOpt
             nrPerformed = r.getInteger(0, 2);
             break;
         case SHOW_TABLES:
-            nrPerformed = r.getInteger(0, 1);
-            break;
-        case CREATE_TABLE:
             nrPerformed = r.getInteger(0, 1);
             break;
         case INSERT:
@@ -148,7 +139,7 @@ public class MySQLProvider extends SQLProviderAdapter<MySQLGlobalState, MySQLOpt
 
     @Override
     public void generateDatabase(MySQLGlobalState globalState) throws Exception {
-        while (globalState.getSchema().getDatabaseTables().size() < Randomly.smallNumber() + 1) {
+        while (globalState.getSchema().getDatabaseTables().size() < Randomly.getNotCachedInteger(1, 2)) {
             String tableName = DBMSCommon.createTableName(globalState.getSchema().getDatabaseTables().size());
             SQLQueryAdapter createTable = MySQLTableGenerator.generate(globalState, tableName);
             globalState.executeStatement(createTable);

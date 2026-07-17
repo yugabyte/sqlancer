@@ -11,7 +11,6 @@ import sqlancer.doris.DorisSchema;
 import sqlancer.doris.DorisSchema.DorisColumn;
 import sqlancer.doris.DorisSchema.DorisTable;
 import sqlancer.doris.ast.DorisExpression;
-import sqlancer.doris.visitor.DorisExprToNode;
 import sqlancer.doris.visitor.DorisToStringVisitor;
 
 public final class DorisUpdateGenerator extends AbstractUpdateGenerator<DorisColumn> {
@@ -24,10 +23,11 @@ public final class DorisUpdateGenerator extends AbstractUpdateGenerator<DorisCol
     }
 
     public static SQLQueryAdapter getQuery(DorisGlobalState globalState) {
-        return new DorisUpdateGenerator(globalState).generate();
+        return new DorisUpdateGenerator(globalState).getStatement();
     }
 
-    private SQLQueryAdapter generate() {
+    @Override
+    public void buildStatement() {
         DorisTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
         List<DorisColumn> columns = table.getRandomNonEmptyColumnSubset();
         gen = new DorisNewExpressionGenerator(globalState).setColumns(table.getColumns());
@@ -35,17 +35,15 @@ public final class DorisUpdateGenerator extends AbstractUpdateGenerator<DorisCol
         sb.append(table.getName());
         sb.append(" SET ");
         updateColumns(columns);
-        sb.append(" WHERE ");
-        sb.append(DorisToStringVisitor.asString(gen.generateExpression(DorisSchema.DorisDataType.BOOLEAN)));
+        appendWhereClause(DorisToStringVisitor.asString(gen.generateExpression(DorisSchema.DorisDataType.BOOLEAN)));
         DorisErrors.addInsertErrors(errors);
-        return new SQLQueryAdapter(sb.toString(), errors);
     }
 
     @Override
     protected void updateValue(DorisColumn column) {
         if (Randomly.getBooleanWithSmallProbability()) {
             DorisExpression expr = gen.generateExpression(column.getType().getPrimitiveDataType());
-            sb.append(DorisToStringVisitor.asString(DorisExprToNode.cast(expr)));
+            sb.append(DorisToStringVisitor.asString(expr));
         } else {
             DorisExpression expr = gen.generateConstant(column.getType().getPrimitiveDataType(), column.isNullable());
             sb.append(DorisToStringVisitor.asString(expr));

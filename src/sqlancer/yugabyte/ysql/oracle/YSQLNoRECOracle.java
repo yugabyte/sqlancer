@@ -9,9 +9,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import sqlancer.IgnoreMeException;
+import sqlancer.Main.StateLogger;
+import sqlancer.MainOptions;
 import sqlancer.Randomly;
-import sqlancer.common.oracle.NoRECBase;
+import sqlancer.SQLConnection;
 import sqlancer.common.oracle.TestOracle;
+import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLancerResultSet;
 import sqlancer.yugabyte.ysql.YSQLCompoundDataType;
@@ -32,12 +35,24 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPBase;
 
-public class YSQLNoRECOracle extends NoRECBase<YSQLGlobalState> implements TestOracle<YSQLGlobalState> {
+public class YSQLNoRECOracle implements TestOracle<YSQLGlobalState> {
+
+    // Inlined from the upstream-removed NoRECBase (deleted as dead code in sqlancer/main).
+    private final YSQLGlobalState state;
+    private final ExpectedErrors errors = new ExpectedErrors();
+    private final StateLogger logger;
+    private final MainOptions options;
+    private final SQLConnection con;
+    private String optimizedQueryString;
+    private String unoptimizedQueryString;
 
     private final YSQLSchema s;
 
     public YSQLNoRECOracle(YSQLGlobalState globalState) {
-        super(globalState);
+        this.state = globalState;
+        this.con = globalState.getConnection();
+        this.logger = globalState.getLogger();
+        this.options = globalState.getOptions();
         this.s = globalState.getSchema();
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonFetchErrors(errors);
@@ -153,7 +168,7 @@ public class YSQLNoRECOracle extends NoRECBase<YSQLGlobalState> implements TestO
         select.setFromList(randomTables);
         select.setWhereClause(randomWhereCondition);
         if (Randomly.getBooleanWithSmallProbability()) {
-            select.setOrderByExpressions(new YSQLExpressionGenerator(state).setColumns(columns).generateOrderBy());
+            select.setOrderByClauses(new YSQLExpressionGenerator(state).setColumns(columns).generateOrderBy());
         }
         select.setSelectType(YSQLSelect.SelectType.ALL);
         select.setJoinClauses(joinStatements);

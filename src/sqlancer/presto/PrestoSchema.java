@@ -27,7 +27,7 @@ public class PrestoSchema extends AbstractSchema<PrestoGlobalState, PrestoSchema
         List<String> tableNames = getTableNames(con);
         for (String tableName : tableNames) {
             List<PrestoColumn> databaseColumns = getTableColumns(con, databaseName, tableName);
-            boolean isView = tableName.startsWith("v");
+            boolean isView = matchesViewName(tableName);
             PrestoTable t = new PrestoTable(tableName, databaseColumns, isView);
             for (PrestoColumn c : databaseColumns) {
                 c.setTable(t);
@@ -151,8 +151,10 @@ public class PrestoSchema extends AbstractSchema<PrestoGlobalState, PrestoSchema
             primitiveType = PrestoDataType.JSON;
             break;
         case "ARRAY":
+            int bracesEnd = typeString.length() - 1;
             primitiveType = PrestoDataType.ARRAY;
-            break;
+            PrestoCompositeDataType elementType = getColumnType(typeString.substring(bracesStart + 1, bracesEnd));
+            return new PrestoCompositeDataType(primitiveType, elementType);
         case "NULL":
             primitiveType = PrestoDataType.NULL;
             break;
@@ -451,6 +453,7 @@ public class PrestoSchema extends AbstractSchema<PrestoGlobalState, PrestoSchema
             this.isNullable = isNullable;
         }
 
+        @Override
         public boolean isPrimaryKey() {
             return isPrimaryKey;
         }

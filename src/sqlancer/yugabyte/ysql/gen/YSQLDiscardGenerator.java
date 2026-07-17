@@ -34,6 +34,8 @@ public final class YSQLDiscardGenerator {
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors) {
 
+            private static final long serialVersionUID = 1L;
+
             @Override
             public boolean couldAffectSchema() {
                 return canDiscardTemporaryTables(what);

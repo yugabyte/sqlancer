@@ -63,8 +63,8 @@ public class PostgresPivotedQuerySynthesisOracle
             selectStatement.setOffsetClause(offsetClause);
         }
         List<PostgresExpression> orderBy = new PostgresExpressionGenerator(globalState).setColumns(columns)
-                .generateOrderBy();
-        selectStatement.setOrderByExpressions(orderBy);
+                .generateOrderBys();
+        selectStatement.setOrderByClauses(orderBy);
         return new SQLQueryAdapter(PostgresVisitor.asString(selectStatement));
     }
 
