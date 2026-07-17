@@ -287,7 +287,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             createDatabaseSync(globalState, entryDatabaseName);
         }
 
-        // When database creation is disabled (e.g. the BLOCKED_DDL oracle), the per-thread "databaseN" is never
+        // When database creation is disabled (--create-databases=false), the per-thread "databaseN" is never
         // created, so connect to the pre-existing entry database instead of a name that does not exist.
         String targetDatabaseName = globalState.getDbmsSpecificOptions().createDatabases ? databaseName
                 : entryDatabaseName;
