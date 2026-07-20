@@ -13,13 +13,16 @@ import sqlancer.common.oracle.CompositeTestOracle;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
 import sqlancer.yugabyte.ysql.oracle.YSQLCERTOracle;
+import sqlancer.yugabyte.ysql.oracle.YSQLCODDTestOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
+import sqlancer.yugabyte.ysql.oracle.YSQLDQPOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
 import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLPivotedQuerySynthesisOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLScanGUCOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPAggregateOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPDistinctOracle;
+import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPGroupByOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPHavingOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPWhereOracle;
 
@@ -129,6 +132,24 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLTLPDistinctOracle(globalState);
+            }
+        },
+        GROUP_BY {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLTLPGroupByOracle(globalState);
+            }
+        },
+        DQP {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLDQPOracle(globalState);
+            }
+        },
+        CODDTEST {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLCODDTestOracle(globalState);
             }
         }
 
