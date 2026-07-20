@@ -72,6 +72,18 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             // Cost-model / statistics toggles change plan choice only.
             { "yb_enable_base_scans_cost_model=on" }, //
             { "yb_enable_optimizer_statistics=on" }, //
+            // Cost-based optimizer master switch - flip both ways; picks different plans, same results.
+            { "yb_enable_cbo=on" }, //
+            { "yb_enable_cbo=off" }, //
+            // Batched-nested-loop internals (hashing / first-batch optimization) - plan detail only.
+            { "yb_bnl_enable_hashing=off" }, //
+            { "yb_bnl_optimize_first_batch=off" }, //
+            // Planner derivations: advanced index-cond folding, equivalence-class equalities, derived scalar-array ops.
+            // These add/remove logically-implied quals and index conditions, so the result set must be unchanged.
+            { "yb_enable_advanced_index_cond_fold=off" }, //
+            { "yb_enable_derived_equalities=off" }, //
+            { "yb_enable_derived_saops=off" }, //
+            { "yb_enable_geolocation_costing=off" }, //
     };
 
     private final YSQLGlobalState state;
