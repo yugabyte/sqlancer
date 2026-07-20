@@ -55,6 +55,9 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        // Generated predicates may embed scalar subqueries that return >1 row ("more than one row returned by a
+        // subquery used as an expression") - a legitimate evaluation error, not a plan-dependent result mismatch.
+        YSQLErrors.addSubqueryErrors(errors);
         gucErrors.add("unrecognized configuration parameter");
         gucErrors.add("invalid value for parameter");
         gucErrors.add("cannot be changed");
