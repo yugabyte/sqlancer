@@ -17,6 +17,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
@@ -132,6 +133,13 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
         if (op.getEscapeCharacter() != null) {
             visit(op.getEscapeCharacter());
         }
+    }
+
+    @Override
+    public void visit(YSQLLikeOperation op) {
+        print(op);
+        visit(op.getLeft());
+        visit(op.getRight());
     }
 
     @Override

@@ -21,6 +21,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
@@ -84,6 +85,8 @@ public interface YSQLVisitor {
 
     void visit(YSQLSimilarTo op);
 
+    void visit(YSQLLikeOperation op);
+
     void visit(YSQLPOSIXRegularExpression op);
 
     void visit(YSQLFromTable from);
@@ -145,6 +148,8 @@ public interface YSQLVisitor {
             visit((YSQLPostfixText) expression);
         } else if (expression instanceof YSQLSimilarTo) {
             visit((YSQLSimilarTo) expression);
+        } else if (expression instanceof YSQLLikeOperation) {
+            visit((YSQLLikeOperation) expression);
         } else if (expression instanceof YSQLPOSIXRegularExpression) {
             visit((YSQLPOSIXRegularExpression) expression);
         } else if (expression instanceof YSQLFromTable) {

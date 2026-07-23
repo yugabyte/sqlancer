@@ -38,6 +38,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
@@ -429,6 +430,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             YSQLExpression regex = YSQLConstant
                     .createTextConstant(Randomly.fromOptions("test", "[a-z]+", ".*", "[0-9]*", "abc"));
             return new YSQLPOSIXRegularExpression(text, regex, YSQLPOSIXRegularExpression.POSIXRegex.getRandom());
+        case LIKE:
+            return new YSQLLikeOperation(generateExpression(depth + 1, YSQLDataType.TEXT),
+                    generateExpression(depth + 1, YSQLDataType.TEXT), Randomly.getBoolean());
         case BINARY_RANGE_COMPARISON:
             // TODO element check
             return new YSQLBinaryRangeOperation(YSQLBinaryRangeOperation.YSQLBinaryRangeComparisonOperator.getRandom(),
@@ -1133,7 +1137,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
-        SIMILAR_TO, POSIX_REGEX, BINARY_RANGE_COMPARISON, CASE_EXPRESSION, EXISTS_SUBQUERY, IN_SUBQUERY,
+        SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, CASE_EXPRESSION, EXISTS_SUBQUERY, IN_SUBQUERY,
         QUANTIFIED_COMPARISON
     }
 

@@ -26,6 +26,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin.YSQLJoinType;
+import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
@@ -279,6 +280,17 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         if (op.getEscapeCharacter() != null) {
             visit(op.getEscapeCharacter());
         }
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLLikeOperation op) {
+        sb.append("(");
+        visit(op.getLeft());
+        sb.append(" ");
+        sb.append(op.getOperatorRepresentation());
+        sb.append(" ");
+        visit(op.getRight());
         sb.append(")");
     }
 

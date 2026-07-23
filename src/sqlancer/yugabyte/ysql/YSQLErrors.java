@@ -212,6 +212,7 @@ public final class YSQLErrors {
         errors.add("character number must be positive");
         errors.add("You might need to add explicit type casts");
         errors.add("invalid regular expression");
+        errors.add("LIKE pattern must not end with escape character");
         errors.add("could not determine which collation to use");
         errors.add("invalid input syntax for integer");
         errors.add("operator does not exist");
