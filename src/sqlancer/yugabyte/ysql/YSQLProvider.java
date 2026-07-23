@@ -52,6 +52,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSimpleVectorGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLStatisticsGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGroupGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTransactionGenerator;
@@ -210,6 +211,12 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             break;
         case GRANT_REVOKE:
             nrPerformed = r.getInteger(0, 2);
+            break;
+        case CREATE_STATISTICS:
+            nrPerformed = r.getInteger(0, 2);
+            break;
+        case DROP_STATISTICS:
+            nrPerformed = r.getInteger(0, 1);
             break;
         default:
             throw new AssertionError(a);
@@ -582,7 +589,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             default:
                 return YSQLSimpleVectorGenerator.testVectorSettings(g);
             }
-        });
+        }), //
+        CREATE_STATISTICS(YSQLStatisticsGenerator::insert), //
+        DROP_STATISTICS(YSQLStatisticsGenerator::remove);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

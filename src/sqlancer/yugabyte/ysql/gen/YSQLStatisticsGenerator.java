@@ -44,8 +44,12 @@ public final class YSQLStatisticsGenerator {
         sb.append(randomColumns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
         sb.append(" FROM ");
         sb.append(randomTable.getName());
-        return new SQLQueryAdapter(sb.toString(), ExpectedErrors.from("cannot have more than 8 columns in statistics"),
-                true);
+        return new SQLQueryAdapter(sb.toString(), ExpectedErrors.from("cannot have more than 8 columns in statistics",
+                // Extended statistics require btree-orderable columns; geometric/other types have no
+                // default btree operator class - a legitimate rejection, not a bug.
+                "cannot be used in statistics", "has no default btree operator class",
+                // A prior tolerated error may leave the surrounding transaction block aborted.
+                "current transaction is aborted, commands ignored until end of transaction block"), true);
     }
 
     public static SQLQueryAdapter remove(YSQLGlobalState globalState) {
@@ -56,7 +60,8 @@ public final class YSQLStatisticsGenerator {
             throw new IgnoreMeException();
         }
         sb.append(Randomly.fromList(statistics).getName());
-        return new SQLQueryAdapter(sb.toString(), true);
+        return new SQLQueryAdapter(sb.toString(), ExpectedErrors.from("does not exist",
+                "current transaction is aborted, commands ignored until end of transaction block"), true);
     }
 
     private static String getNewStatisticsName(YSQLTable randomTable) {
