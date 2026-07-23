@@ -84,6 +84,17 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_enable_derived_equalities=off" }, //
             { "yb_enable_derived_saops=off" }, //
             { "yb_enable_geolocation_costing=off" }, //
+            // Newer (2025-2026) planner/executor knobs. All are plan- or estimate-only: mixed-mode pushdown, index-only
+            // PK decoding, column-statistics prefetch, legacy row-count estimation, and the LSM merge-scan / SAOP-merge
+            // stream limits (the merge-scan path has a recent wrong-results history, e.g. YB #31200 / #30943). Each is
+            // flipped away from its shipped default.
+            { "yb_mixed_mode_expression_pushdown=off" }, //
+            { "yb_mixed_mode_saop_pushdown=on" }, //
+            { "yb_enable_primary_key_decode_from_index=on" }, //
+            { "yb_prefetch_column_statistics=off" }, //
+            { "yb_ignore_bool_cond_for_legacy_estimate=on" }, //
+            { "yb_max_merge_scan_streams=1" }, //
+            { "yb_max_saop_merge_streams=1" }, //
     };
 
     private final YSQLGlobalState state;
