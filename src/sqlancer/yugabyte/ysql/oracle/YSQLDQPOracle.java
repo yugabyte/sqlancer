@@ -44,6 +44,13 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
             { "yb_bnl_batch_size=1" }, //
             { "yb_enable_cbo=off" }, //
             { "yb_enable_cbo=on" }, //
+            // Pushdown / scan-strategy forcers - each changes the physical plan only, so results must be invariant.
+            { "yb_enable_distinct_pushdown=off" }, //
+            { "yb_enable_saop_pushdown=off" }, //
+            { "yb_enable_index_aggregate_pushdown=off" }, //
+            { "yb_max_merge_scan_streams=1" }, //
+            { "yb_enable_primary_key_decode_from_index=on" }, //
+            { "yb_fetch_row_limit=1" }, //
     };
 
     private final YSQLGlobalState state;
