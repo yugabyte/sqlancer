@@ -15,6 +15,7 @@ import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
 import sqlancer.yugabyte.ysql.oracle.YSQLCERTOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCODDTestOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
+import sqlancer.yugabyte.ysql.oracle.YSQLDQEOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLDQPOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
 import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
@@ -150,6 +151,12 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLCODDTestOracle(globalState);
+            }
+        },
+        DQE {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLDQEOracle(globalState);
             }
         }
 
