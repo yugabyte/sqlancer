@@ -21,6 +21,7 @@ import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLBinaryArrayOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryBitOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryComparisonOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
@@ -380,6 +381,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             validOptions.remove(BooleanExpression.SIMILAR_TO);
             validOptions.remove(BooleanExpression.POSIX_REGEX);
             validOptions.remove(BooleanExpression.BINARY_RANGE_COMPARISON);
+            validOptions.remove(BooleanExpression.ARRAY_OPERATION);
             validOptions.remove(BooleanExpression.EXISTS_SUBQUERY);
             validOptions.remove(BooleanExpression.IN_SUBQUERY);
             validOptions.remove(BooleanExpression.QUANTIFIED_COMPARISON);
@@ -438,6 +440,14 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return new YSQLBinaryRangeOperation(YSQLBinaryRangeOperation.YSQLBinaryRangeComparisonOperator.getRandom(),
                     generateExpression(depth + 1, YSQLDataType.RANGE),
                     generateExpression(depth + 1, YSQLDataType.RANGE));
+        case ARRAY_OPERATION:
+            // Both operands are cast to one shared array type; without the cast the array literals render as untyped
+            // 'unknown' strings and "@> / <@ / &&" fail to resolve ("operator is not unique"), skipping the round.
+            YSQLDataType arrayType = Randomly.fromOptions(YSQLDataType.INT_ARRAY, YSQLDataType.TEXT_ARRAY,
+                    YSQLDataType.BOOLEAN_ARRAY);
+            return new YSQLBinaryArrayOperation(YSQLBinaryArrayOperation.YSQLArrayOperator.getRandom(),
+                    new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)),
+                    new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)));
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.BOOLEAN);
         case EXISTS_SUBQUERY:
@@ -1137,8 +1147,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
-        SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, CASE_EXPRESSION, EXISTS_SUBQUERY, IN_SUBQUERY,
-        QUANTIFIED_COMPARISON
+        SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, CASE_EXPRESSION, EXISTS_SUBQUERY,
+        IN_SUBQUERY, QUANTIFIED_COMPARISON
     }
 
     private enum RangeExpression {
