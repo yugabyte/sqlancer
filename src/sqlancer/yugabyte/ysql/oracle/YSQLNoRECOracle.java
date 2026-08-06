@@ -124,6 +124,12 @@ public class YSQLNoRECOracle implements TestOracle<YSQLGlobalState> {
         }
     }
 
+    @Override
+    public String getLastQueryString() {
+        // The plain (optimized) SELECT is the query whose plan QPG tracks for coverage guidance.
+        return optimizedQueryString;
+    }
+
     private YSQLExpression getRandomWhereCondition(List<YSQLColumn> columns) {
         return new YSQLExpressionGenerator(state).setColumns(columns).generateExpression(YSQLDataType.BOOLEAN);
     }

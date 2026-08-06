@@ -2,14 +2,21 @@ package sqlancer.yugabyte.ysql;
 
 import static sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory.CATALOG;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.auto.service.AutoService;
 
 import sqlancer.AbstractAction;
@@ -24,6 +31,7 @@ import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
+import sqlancer.common.query.SQLancerResultSet;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterDatabaseGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
@@ -310,6 +318,78 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     @Override
     public String getDBMSName() {
         return "ysql";
+    }
+
+    // QPG (Query Plan Guidance) support: steer data generation toward unexercised query plans. These methods let the
+    // base generateAndTestDatabaseWithQueryPlanGuidance loop obtain a query's plan shape, mutate tables, and score
+    // mutators. QPG adds no query surface - it only changes which schema/data states the configured oracle runs
+    // against - so it cannot introduce logic false positives.
+
+    @Override
+    protected String getQueryPlan(String selectStr, YSQLGlobalState globalState) throws Exception {
+        if (globalState.getOptions().logEachSelect()) {
+            globalState.getLogger().writeCurrent(selectStr);
+        }
+        String queryPlan = "";
+        SQLQueryAdapter q = new SQLQueryAdapter("EXPLAIN (FORMAT JSON) " + selectStr, new ExpectedErrors());
+        try (SQLancerResultSet rs = q.executeAndGet(globalState)) {
+            while (rs != null && rs.next()) {
+                queryPlan += rs.getString(1);
+            }
+        } catch (SQLException | AssertionError e) {
+            // An un-plannable query yields an empty plan; the QPG loop treats that as invalid and drops it.
+            return "";
+        }
+        if (queryPlan.isEmpty()) {
+            return "";
+        }
+        return formatQueryPlan(queryPlan);
+    }
+
+    private String formatQueryPlan(String queryPlan) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(queryPlan).get(0).get("Plan");
+        return String.join(" ", extractNodeTypesIterative(root));
+    }
+
+    // BFS over the JSON plan tree, collecting node types into a stable plan-shape string.
+    private static List<String> extractNodeTypesIterative(JsonNode root) {
+        List<String> result = new ArrayList<>();
+        Queue<JsonNode> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            JsonNode node = queue.poll();
+            if (node.has("Node Type")) {
+                result.add(node.get("Node Type").asText());
+            }
+            if (node.has("Plans") && node.get("Plans").isArray()) {
+                for (JsonNode plan : node.get("Plans")) {
+                    queue.add(plan);
+                }
+            }
+        }
+        return result;
+    }
+
+    @Override
+    protected double[] initializeWeightedAverageReward() {
+        return new double[Action.values().length];
+    }
+
+    @Override
+    protected void executeMutator(int index, YSQLGlobalState globalState) throws Exception {
+        globalState.executeStatement(Action.values()[index].getQuery(globalState));
+    }
+
+    @Override
+    protected boolean addRowsToAllTables(YSQLGlobalState globalState) throws Exception {
+        // Only exercised by PQS+QPG. Best-effort top-up of empty tables via the standard INSERT generator.
+        long emptyTables = globalState.getSchema().getDatabaseTables().stream()
+                .filter(t -> !t.isView() && t.getNrRows(globalState) == 0).count();
+        for (long i = 0; i < emptyTables; i++) {
+            globalState.executeStatement(YSQLInsertGenerator.insert(globalState));
+        }
+        return true;
     }
 
     private void createDatabaseSync(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
