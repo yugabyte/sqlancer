@@ -38,6 +38,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCommentGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCopyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCursorGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLDdlTransactionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDeleteGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDiscardGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDoBlockGenerator;
@@ -225,6 +226,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             break;
         case DROP_STATISTICS:
             nrPerformed = r.getInteger(0, 1);
+            break;
+        case DDL_TRANSACTION:
+            // Exercises the yb_ddl_transaction_block_enabled feature; no-op (tolerated error) when it is off.
+            nrPerformed = isPgCompat ? 0 : r.getInteger(0, 3);
             break;
         default:
             throw new AssertionError(a);
@@ -671,7 +676,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             }
         }), //
         CREATE_STATISTICS(YSQLStatisticsGenerator::insert), //
-        DROP_STATISTICS(YSQLStatisticsGenerator::remove);
+        DROP_STATISTICS(YSQLStatisticsGenerator::remove), //
+        DDL_TRANSACTION(YSQLDdlTransactionGenerator::create);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 
