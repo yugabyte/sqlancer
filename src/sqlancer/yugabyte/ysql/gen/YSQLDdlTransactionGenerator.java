@@ -43,7 +43,11 @@ public final class YSQLDdlTransactionGenerator {
         StringBuilder sb = new StringBuilder("BEGIN;\n");
         int count = Randomly.smallNumber() + 1;
         for (int i = 0; i < count; i++) {
-            sb.append(randomDdl(globalState, tables).getUnterminatedQueryString()).append(";\n");
+            SQLQueryAdapter ddl = randomDdl(globalState, tables);
+            sb.append(ddl.getUnterminatedQueryString()).append(";\n");
+            // Inherit each composed generator's tolerated errors - otherwise DDL-specific rejections (e.g. an index
+            // expression with no default operator class) would leak out of the block as false positives.
+            errors.add(ddl.getExpectedErrors());
         }
         // Occasionally roll back to exercise DDL-transaction atomicity (the block must leave no schema change behind).
         sb.append(Randomly.getBooleanWithRatherLowProbability() ? "ROLLBACK;" : "COMMIT;");

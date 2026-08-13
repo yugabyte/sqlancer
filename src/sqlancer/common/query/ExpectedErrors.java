@@ -60,6 +60,24 @@ public class ExpectedErrors implements Serializable {
         return this;
     }
 
+    /**
+     * Merges the error strings and regexes of another {@link ExpectedErrors} into this one. Useful when a statement is
+     * composed from several generators and must tolerate every error any of them can legitimately produce.
+     *
+     * @param other
+     *            the errors to merge into this instance
+     *
+     * @return this instance, for chaining
+     */
+    public ExpectedErrors add(ExpectedErrors other) {
+        if (other == null) {
+            throw new IllegalArgumentException();
+        }
+        errors.addAll(other.errors);
+        regexes.addAll(other.regexes);
+        return this;
+    }
+
     public ExpectedErrors addAllRegexes(Collection<Pattern> list) {
         if (list == null) {
             throw new IllegalArgumentException();
