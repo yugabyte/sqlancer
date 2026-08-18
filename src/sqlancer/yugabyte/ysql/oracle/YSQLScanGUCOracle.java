@@ -95,6 +95,12 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_ignore_bool_cond_for_legacy_estimate=on" }, //
             { "yb_max_merge_scan_streams=1" }, //
             { "yb_max_saop_merge_streams=1" }, //
+            // Cost / parallel-split knobs that only steer plan choice, never the row set: a high network-fetch cost,
+            // a tiny parallel range size (more, smaller DocDB scan ranges), and the cluster-config geolocation
+            // costing source.
+            { "yb_network_fetch_cost=1000000" }, //
+            { "yb_parallel_range_size=1024" }, //
+            { "yb_use_cluster_config_for_geolocation_costing=on" }, //
     };
 
     private final YSQLGlobalState state;
