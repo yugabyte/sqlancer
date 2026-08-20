@@ -54,6 +54,8 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
         YSQLErrors.addTransactionErrors(ddlErrors);
         ddlErrors.add("does not exist");
         ddlErrors.add("already exists");
+        // Other DDL generators may have already grown the table to the column limit before the aux columns are added.
+        ddlErrors.add("tables can have at most 1600 columns");
     }
 
     @Override
@@ -124,10 +126,13 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
     }
 
     private Set<String> accessedByDelete(String tableName, String whereClauseStr) throws SQLException {
-        Set<String> before = new HashSet<>(
-                getResultSetFirstColumnAsString("SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state));
         new SQLQueryAdapter("BEGIN").execute(state);
         try {
+            // Read the before/after snapshots inside the same transaction so both use one consistent read point.
+            // Reading "before" in autocommit compared it against the in-transaction "after" at a different YB
+            // snapshot, which produced spurious empty deltas (DELETE=[]) on colocated databases.
+            Set<String> before = new HashSet<>(
+                    getResultSetFirstColumnAsString("SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state));
             if (!new SQLQueryAdapter(generateDeleteStatement(tableName, whereClauseStr), errors).execute(state)) {
                 throw new IgnoreMeException();
             }
