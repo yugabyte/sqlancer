@@ -34,8 +34,9 @@ import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
  * <p>
  * To stay noise-free the oracle only compares rounds in which all three statements execute cleanly: if the shared
  * predicate raises any tolerated error (e.g. a type/expression error), the whole round is skipped rather than
- * attempting the fragile cross-statement error comparison the upstream MySQL implementation performs. The UPDATE and
- * DELETE each run inside their own {@code BEGIN}/{@code ROLLBACK}, so the table content is never actually modified.
+ * attempting the fragile cross-statement error comparison the upstream MySQL implementation performs. All three
+ * statements run inside one {@code BEGIN}/{@code ROLLBACK} so they observe a single consistent read snapshot (avoiding
+ * spurious mismatches from YugabyteDB's per-transaction read times), and the table content is never actually modified.
  */
 public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracle<YSQLGlobalState> {
 
@@ -94,54 +95,44 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
             addAuxiliaryColumns(table);
             added = true;
 
-            Set<String> selectRows = new HashSet<>(getResultSetFirstColumnAsString(
-                    generateSelectStatement(null, tableName, whereClauseStr), errors, state));
-            Set<String> updateRows = accessedByUpdate(tableName, whereClauseStr);
-            Set<String> deleteRows = accessedByDelete(tableName, whereClauseStr);
+            // Run every read and write inside a single transaction so all three row sets are observed at one
+            // consistent snapshot. Comparing an autocommit SELECT against separate per-statement transactions let
+            // YugabyteDB's per-transaction read time differ (notably on colocated databases), which surfaced as
+            // spurious mismatches (SELECT/UPDATE find a row but DELETE reports none). The UPDATE and DELETE are rolled
+            // back, so the table is never actually modified.
+            new SQLQueryAdapter("BEGIN").execute(state);
+            try {
+                Set<String> selectRows = new HashSet<>(getResultSetFirstColumnAsString(
+                        generateSelectStatement(null, tableName, whereClauseStr), errors, state));
 
-            if (!selectRows.equals(updateRows) || !selectRows.equals(deleteRows)) {
-                throw new AssertionError(
-                        String.format("DQE row-set mismatch on %s WHERE %s%n  SELECT=%s%n  UPDATE=%s%n  DELETE=%s",
-                                tableName, whereClauseStr, selectRows, updateRows, deleteRows));
+                if (!new SQLQueryAdapter(generateUpdateStatement(null, tableName, whereClauseStr), errors)
+                        .execute(state)) {
+                    throw new IgnoreMeException();
+                }
+                Set<String> updateRows = new HashSet<>(getResultSetFirstColumnAsString(
+                        "SELECT " + COLUMN_ROWID + " FROM " + tableName + " WHERE " + COLUMN_UPDATED + " = 1", errors,
+                        state));
+
+                Set<String> deleteRows = new HashSet<>(getResultSetFirstColumnAsString(
+                        "SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state));
+                if (!new SQLQueryAdapter(generateDeleteStatement(tableName, whereClauseStr), errors).execute(state)) {
+                    throw new IgnoreMeException();
+                }
+                deleteRows.removeAll(new HashSet<>(getResultSetFirstColumnAsString(
+                        "SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state)));
+
+                if (!selectRows.equals(updateRows) || !selectRows.equals(deleteRows)) {
+                    throw new AssertionError(
+                            String.format("DQE row-set mismatch on %s WHERE %s%n  SELECT=%s%n  UPDATE=%s%n  DELETE=%s",
+                                    tableName, whereClauseStr, selectRows, updateRows, deleteRows));
+                }
+            } finally {
+                new SQLQueryAdapter("ROLLBACK").execute(state);
             }
         } finally {
             if (added) {
                 dropAuxiliaryColumns(table);
             }
-        }
-    }
-
-    private Set<String> accessedByUpdate(String tableName, String whereClauseStr) throws SQLException {
-        new SQLQueryAdapter("BEGIN").execute(state);
-        try {
-            if (!new SQLQueryAdapter(generateUpdateStatement(null, tableName, whereClauseStr), errors).execute(state)) {
-                throw new IgnoreMeException();
-            }
-            return new HashSet<>(getResultSetFirstColumnAsString(
-                    "SELECT " + COLUMN_ROWID + " FROM " + tableName + " WHERE " + COLUMN_UPDATED + " = 1", errors,
-                    state));
-        } finally {
-            new SQLQueryAdapter("ROLLBACK").execute(state);
-        }
-    }
-
-    private Set<String> accessedByDelete(String tableName, String whereClauseStr) throws SQLException {
-        new SQLQueryAdapter("BEGIN").execute(state);
-        try {
-            // Read the before/after snapshots inside the same transaction so both use one consistent read point.
-            // Reading "before" in autocommit compared it against the in-transaction "after" at a different YB
-            // snapshot, which produced spurious empty deltas (DELETE=[]) on colocated databases.
-            Set<String> before = new HashSet<>(
-                    getResultSetFirstColumnAsString("SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state));
-            if (!new SQLQueryAdapter(generateDeleteStatement(tableName, whereClauseStr), errors).execute(state)) {
-                throw new IgnoreMeException();
-            }
-            Set<String> after = new HashSet<>(
-                    getResultSetFirstColumnAsString("SELECT " + COLUMN_ROWID + " FROM " + tableName, errors, state));
-            before.removeAll(after);
-            return before;
-        } finally {
-            new SQLQueryAdapter("ROLLBACK").execute(state);
         }
     }
 
