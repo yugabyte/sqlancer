@@ -86,6 +86,12 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
             throw new IgnoreMeException();
         }
         String tableName = table.getName();
+        // A DO INSTEAD rule on SELECT/UPDATE/DELETE (pg_rewrite.ev_type 1/2/4) rewrites or silences that statement
+        // (e.g. DO INSTEAD NOTHING on DELETE makes DELETE a no-op while SELECT/UPDATE still return the row) - correct
+        // PostgreSQL semantics, but produces exactly the row-set mismatch pattern DQE looks for. Skip the round.
+        if (hasInsteadRule(tableName)) {
+            throw new IgnoreMeException();
+        }
 
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(state).setColumns(table.getColumns());
         String whereClauseStr = YSQLVisitor.asString(gen.generateExpression(0, YSQLDataType.BOOLEAN));
@@ -134,6 +140,13 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
                 dropAuxiliaryColumns(table);
             }
         }
+    }
+
+    private boolean hasInsteadRule(String tableName) throws SQLException {
+        // pg_rewrite.ev_type: '1'=SELECT, '2'=UPDATE, '4'=DELETE. INSERT ('3') is not on DQE's path.
+        String q = "SELECT 1 FROM pg_rewrite WHERE ev_class = '" + tableName
+                + "'::regclass AND is_instead AND ev_type IN ('1','2','4') LIMIT 1";
+        return !getResultSetFirstColumnAsString(q, errors, state).isEmpty();
     }
 
     @Override
