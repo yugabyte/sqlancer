@@ -31,6 +31,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 
 public final class YSQLExpectedValueVisitor implements YSQLVisitor {
@@ -147,6 +148,12 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
         print(op);
         visit(op.getString());
         visit(op.getRegex());
+    }
+
+    @Override
+    public void visit(YSQLTimezoneExtract op) {
+        print(op);
+        visit(op.getTimeExpr());
     }
 
     @Override

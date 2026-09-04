@@ -22,6 +22,12 @@ public final class YugabyteBugs {
     // Known YB bug; tolerate the error while unfixed and flip to false to start catching it once resolved.
     public static boolean bugPlannerVariableNotFoundInSubplan = true;
 
+    // YSQL: EXTRACT(field FROM ts AT TIME ZONE '<named zone>') raises "time zone \"...\" not recognized" when
+    // yb_enable_expression_pushdown=on because the DocDB tserver's postgres backend cannot locate share/timezone
+    // (reproduces on production release tarballs; offset zones like '+00' are unaffected). Phorge D51850 /
+    // yugabyte-db#30815; flip to false once shipped to start catching regressions and similar-class bugs.
+    public static boolean bugTimezoneNotRecognizedUnderPushdown = true;
+
     private YugabyteBugs() {
     }
 

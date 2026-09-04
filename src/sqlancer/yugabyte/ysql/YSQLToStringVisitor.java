@@ -40,6 +40,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecBetween;
@@ -299,6 +300,17 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         visit(op.getString());
         sb.append(op.getOp().getStringRepresentation());
         visit(op.getRegex());
+    }
+
+    @Override
+    public void visit(YSQLTimezoneExtract op) {
+        sb.append("EXTRACT(");
+        sb.append(op.getField());
+        sb.append(" FROM (");
+        visit(op.getTimeExpr());
+        sb.append(") AT TIME ZONE '");
+        sb.append(op.getZone());
+        sb.append("')");
     }
 
     @Override

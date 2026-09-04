@@ -25,6 +25,11 @@ public final class YSQLErrors {
         if (YugabyteBugs.bugPlannerVariableNotFoundInSubplan) {
             errors.add("variable not found in subplan target list");
         }
+        if (YugabyteBugs.bugTimezoneNotRecognizedUnderPushdown) {
+            // "time zone \"UTC\" not recognized" (or similar zone name) - regex avoids masking unrelated
+            // "not recognized" errors that don't involve a quoted zone name.
+            errors.addRegexString("time zone \"[^\"]+\" not recognized");
+        }
     }
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {

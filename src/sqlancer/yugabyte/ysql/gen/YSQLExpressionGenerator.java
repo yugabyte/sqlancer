@@ -51,6 +51,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLFrameSpecKind;
@@ -382,6 +383,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             validOptions.remove(BooleanExpression.POSIX_REGEX);
             validOptions.remove(BooleanExpression.BINARY_RANGE_COMPARISON);
             validOptions.remove(BooleanExpression.ARRAY_OPERATION);
+            validOptions.remove(BooleanExpression.TIMESTAMP_EXTRACT);
             validOptions.remove(BooleanExpression.EXISTS_SUBQUERY);
             validOptions.remove(BooleanExpression.IN_SUBQUERY);
             validOptions.remove(BooleanExpression.QUANTIFIED_COMPARISON);
@@ -448,6 +450,17 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return new YSQLBinaryArrayOperation(YSQLBinaryArrayOperation.YSQLArrayOperator.getRandom(),
                     new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)),
                     new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)));
+        case TIMESTAMP_EXTRACT:
+            // EXTRACT(<field> FROM <ts> AT TIME ZONE '<zone>') exercises DocDB expression pushdown for timezone
+            // resolution. Mix of named zones (bug trigger: tserver may lack share/timezone dir) and offsets (control).
+            String tzField = Randomly.fromOptions("HOUR", "MINUTE", "DAY", "MONTH", "YEAR", "DOW", "EPOCH");
+            String tzZone = Randomly.fromOptions("UTC", "America/New_York", "Europe/London", "Asia/Kolkata", "+00",
+                    "-05:30");
+            YSQLDataType tsType = Randomly.fromOptions(YSQLDataType.TIMESTAMPTZ, YSQLDataType.TIMESTAMP);
+            return new YSQLBinaryComparisonOperation(
+                    new YSQLTimezoneExtract(tzField, generateExpression(depth + 1, tsType), tzZone),
+                    generateConstant(globalState.getRandomly(), YSQLDataType.INT),
+                    YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.getRandom());
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.BOOLEAN);
         case EXISTS_SUBQUERY:
@@ -1147,8 +1160,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
-        SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, CASE_EXPRESSION, EXISTS_SUBQUERY,
-        IN_SUBQUERY, QUANTIFIED_COMPARISON
+        SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, TIMESTAMP_EXTRACT, CASE_EXPRESSION,
+        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON
     }
 
     private enum RangeExpression {

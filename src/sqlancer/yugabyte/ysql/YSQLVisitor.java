@@ -35,6 +35,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 
@@ -86,6 +87,8 @@ public interface YSQLVisitor {
     void visit(YSQLSimilarTo op);
 
     void visit(YSQLLikeOperation op);
+
+    void visit(YSQLTimezoneExtract op);
 
     void visit(YSQLPOSIXRegularExpression op);
 
@@ -150,6 +153,8 @@ public interface YSQLVisitor {
             visit((YSQLSimilarTo) expression);
         } else if (expression instanceof YSQLLikeOperation) {
             visit((YSQLLikeOperation) expression);
+        } else if (expression instanceof YSQLTimezoneExtract) {
+            visit((YSQLTimezoneExtract) expression);
         } else if (expression instanceof YSQLPOSIXRegularExpression) {
             visit((YSQLPOSIXRegularExpression) expression);
         } else if (expression instanceof YSQLFromTable) {
