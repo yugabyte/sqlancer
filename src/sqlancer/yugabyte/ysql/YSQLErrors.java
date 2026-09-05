@@ -216,6 +216,10 @@ public final class YSQLErrors {
         errors.add("specified more than once");
         errors.add("character number must be positive");
         errors.add("You might need to add explicit type casts");
+        // Variadic conditional functions (COALESCE / GREATEST / LEAST / CASE / NULLIF) reject mixed argument types;
+        // the recursive expression generator's TEXT/BOOL/etc branches can produce operands PG treats as bytea/text[]/
+        // etc., which fail resolution. Legitimate PG behavior, not a bug.
+        errors.add("cannot be matched");
         errors.add("invalid regular expression");
         errors.add("LIKE pattern must not end with escape character");
         errors.add("could not determine which collation to use");

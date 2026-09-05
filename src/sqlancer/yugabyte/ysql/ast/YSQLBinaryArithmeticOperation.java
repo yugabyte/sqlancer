@@ -11,17 +11,30 @@ import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation.YSQLBinaryOperat
 public class YSQLBinaryArithmeticOperation extends BinaryOperatorNode<YSQLExpression, YSQLBinaryOperator>
         implements YSQLExpression {
 
+    private final YSQLDataType returnType;
+
     public YSQLBinaryArithmeticOperation(YSQLExpression left, YSQLExpression right, YSQLBinaryOperator op) {
+        this(left, right, op, YSQLDataType.INT);
+    }
+
+    // Type-aware constructor: NUMERIC / DECIMAL / FLOAT / REAL / DOUBLE_PRECISION / MONEY arithmetic uses the same
+    // (a OP b) rendering but skips the Long-based apply (which would produce wrong expected values for non-INT).
+    public YSQLBinaryArithmeticOperation(YSQLExpression left, YSQLExpression right, YSQLBinaryOperator op,
+            YSQLDataType returnType) {
         super(left, right, op);
+        this.returnType = returnType;
     }
 
     @Override
     public YSQLDataType getExpressionType() {
-        return YSQLDataType.INT;
+        return returnType;
     }
 
     @Override
     public YSQLConstant getExpectedValue() {
+        if (returnType != YSQLDataType.INT) {
+            return null;
+        }
         YSQLConstant leftExpected = getLeft().getExpectedValue();
         YSQLConstant rightExpected = getRight().getExpectedValue();
         if (leftExpected == null || rightExpected == null) {

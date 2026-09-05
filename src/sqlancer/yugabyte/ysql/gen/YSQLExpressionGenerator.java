@@ -100,6 +100,23 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         return Randomly.fromOptions("UTC", "America/New_York", "Europe/London", "Asia/Kolkata", "+00", "-05:30");
     }
 
+    private YSQLExpression numericArithmetic(int depth, YSQLDataType type) {
+        return new YSQLBinaryArithmeticOperation(generateExpression(depth + 1, type),
+                generateExpression(depth + 1, type), YSQLBinaryArithmeticOperation.YSQLBinaryOperator.getRandom(),
+                type);
+    }
+
+    // date + interval / date - interval / timestamp +/- interval / interval +/- interval - covers the DocDB
+    // pushdown surface adjacent to the EXTRACT/AT TIME ZONE timezone bug. Kept simple: use +/- only (multiplication
+    // etc on datetime combinations has more restricted PG rules and would need type-pair tables).
+    private YSQLExpression dateIntervalArithmetic(int depth, YSQLDataType leftType) {
+        YSQLBinaryArithmeticOperation.YSQLBinaryOperator op = Randomly.fromOptions(
+                YSQLBinaryArithmeticOperation.YSQLBinaryOperator.ADDITION,
+                YSQLBinaryArithmeticOperation.YSQLBinaryOperator.SUBTRACTION);
+        return new YSQLBinaryArithmeticOperation(generateExpression(depth + 1, leftType),
+                generateExpression(depth + 1, YSQLDataType.INTERVAL), op, leftType);
+    }
+
     private static YSQLCompoundDataType getCompoundDataType(YSQLDataType type) {
         switch (type) {
         case BOOLEAN:
@@ -359,7 +376,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                 .getSupportedFunctions(type);
         // filters functions by allowed type (STABLE 's', IMMUTABLE 'i', VOLATILE 'v')
         supportedFunctions = supportedFunctions.stream()
-                .filter(f -> allowedFunctionTypes.contains(functionsAndTypes.get(f.getName())))
+                .filter(f -> allowedFunctionTypes
+                        .contains(functionsAndTypes.getOrDefault(f.getName(), YSQLGlobalState.IMMUTABLE)))
                 .collect(Collectors.toList());
         if (supportedFunctions.isEmpty()) {
             throw new IgnoreMeException();
@@ -372,7 +390,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         List<YSQLFunction.YSQLFunctionWithResult> functions = Stream.of(YSQLFunction.YSQLFunctionWithResult.values())
                 .filter(f -> f.supportsReturnType(type)).collect(Collectors.toList());
         // filters functions by allowed type (STABLE 's', IMMUTABLE 'i', VOLATILE 'v')
-        functions = functions.stream().filter(f -> allowedFunctionTypes.contains(functionsAndTypes.get(f.getName())))
+        functions = functions.stream()
+                .filter(f -> allowedFunctionTypes
+                        .contains(functionsAndTypes.getOrDefault(f.getName(), YSQLGlobalState.IMMUTABLE)))
                 .collect(Collectors.toList());
         if (functions.isEmpty()) {
             throw new IgnoreMeException();
@@ -664,6 +684,30 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                             YSQLDataType.DATE, YSQLDataType.INTERVAL, YSQLDataType.TIME);
                     return new YSQLExtract(randomExtractField(), generateExpression(depth + 1, src));
                 }
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    return numericArithmetic(depth, YSQLDataType.NUMERIC);
+                }
+                return generateConstant(r, dataType);
+            case DECIMAL:
+            case REAL:
+            case DOUBLE_PRECISION:
+            case FLOAT:
+            case MONEY:
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    return numericArithmetic(depth, dataType);
+                }
+                return generateConstant(r, dataType);
+            case DATE:
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    // date + interval -> date; date - date -> integer (rendered but returned as DATE so the type
+                    // slot stays consistent; PG accepts it in most positions).
+                    return dateIntervalArithmetic(depth, YSQLDataType.DATE);
+                }
+                return generateConstant(r, dataType);
+            case INTERVAL:
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    return dateIntervalArithmetic(depth, YSQLDataType.INTERVAL);
+                }
                 return generateConstant(r, dataType);
             case TIMESTAMPTZ:
                 if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
@@ -684,14 +728,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                             YSQLDataType.TIMESTAMP);
                 }
                 return generateConstant(r, dataType);
-            case DECIMAL:
-            case REAL:
-            case DOUBLE_PRECISION:
-            case FLOAT:
-            case MONEY:
-            case DATE:
             case TIME:
-            case INTERVAL:
             case INET:
             case CIDR:
             case MACADDR:

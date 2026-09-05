@@ -220,6 +220,89 @@ public class YSQLFunction implements YSQLExpression {
             }
 
         },
+        COALESCE(1, "coalesce") {
+            @Override
+            public YSQLConstant apply(YSQLConstant[] args, YSQLExpression... origArgs) {
+                for (YSQLConstant c : args) {
+                    if (!c.isNull()) {
+                        return c;
+                    }
+                }
+                return YSQLConstant.createNullConstant();
+            }
+
+            @Override
+            public YSQLDataType[] getInputTypesForReturnType(YSQLDataType returnType, int nrArguments) {
+                YSQLDataType[] types = new YSQLDataType[nrArguments];
+                for (int i = 0; i < nrArguments; i++) {
+                    types[i] = returnType;
+                }
+                return types;
+            }
+
+            @Override
+            public boolean supportsReturnType(YSQLDataType type) {
+                return type == YSQLDataType.INT || type == YSQLDataType.BOOLEAN || type == YSQLDataType.TEXT
+                        || type == YSQLDataType.NUMERIC;
+            }
+
+            @Override
+            public boolean isVariadic() {
+                return true;
+            }
+        },
+        GREATEST(1, "greatest") {
+            @Override
+            public YSQLConstant apply(YSQLConstant[] args, YSQLExpression... origArgs) {
+                // No expected value: comparison across mixed types is fragile and PG's coercion rules differ from
+                // ours. Falls into the non-PQS path.
+                return null;
+            }
+
+            @Override
+            public YSQLDataType[] getInputTypesForReturnType(YSQLDataType returnType, int nrArguments) {
+                YSQLDataType[] types = new YSQLDataType[nrArguments];
+                for (int i = 0; i < nrArguments; i++) {
+                    types[i] = returnType;
+                }
+                return types;
+            }
+
+            @Override
+            public boolean supportsReturnType(YSQLDataType type) {
+                return type == YSQLDataType.INT || type == YSQLDataType.NUMERIC || type == YSQLDataType.TEXT;
+            }
+
+            @Override
+            public boolean isVariadic() {
+                return true;
+            }
+        },
+        LEAST(1, "least") {
+            @Override
+            public YSQLConstant apply(YSQLConstant[] args, YSQLExpression... origArgs) {
+                return null;
+            }
+
+            @Override
+            public YSQLDataType[] getInputTypesForReturnType(YSQLDataType returnType, int nrArguments) {
+                YSQLDataType[] types = new YSQLDataType[nrArguments];
+                for (int i = 0; i < nrArguments; i++) {
+                    types[i] = returnType;
+                }
+                return types;
+            }
+
+            @Override
+            public boolean supportsReturnType(YSQLDataType type) {
+                return type == YSQLDataType.INT || type == YSQLDataType.NUMERIC || type == YSQLDataType.TEXT;
+            }
+
+            @Override
+            public boolean isVariadic() {
+                return true;
+            }
+        },
         // Mathematical functions that support pushdown
         CEIL(1, "ceil") {
             @Override
