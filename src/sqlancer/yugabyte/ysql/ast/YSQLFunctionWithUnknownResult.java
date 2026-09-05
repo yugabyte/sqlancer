@@ -73,8 +73,16 @@ public enum YSQLFunctionWithUnknownResult {
     QUOTE_LITERAL("quote_literal", YSQLDataType.TEXT, YSQLDataType.TEXT),
     QUOTE_IDENT("quote_ident", YSQLDataType.TEXT, YSQLDataType.TEXT),
     REGEX_REPLACE("regexp_replace", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
-    // todo mute repeat function because it may provide OOMs
-    // REPEAT("repeat", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT),
+    REPEAT("repeat", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            // Clamp the second argument to a small integer literal. The default random INT can produce huge counts
+            // (e.g. 2^30) that OOM the server; a small constant keeps the same code path covered without the OOM risk.
+            YSQLExpression[] args = super.getArguments(returnType, gen, depth);
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 16));
+            return args;
+        }
+    },
     REPLACE("replace", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
     REVERSE("reverse", YSQLDataType.TEXT, YSQLDataType.TEXT),
     RIGHT("right", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT) {

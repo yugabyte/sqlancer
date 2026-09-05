@@ -36,6 +36,28 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
     }
 
     public static YSQLDataType getColumnType(String typeString) {
+        return getColumnType(typeString, null);
+    }
+
+    public static YSQLDataType getColumnType(String typeString, String udtName) {
+        if ("ARRAY".equals(typeString)) {
+            // Distinguish array element types using pg's internal udt_name (`_int4`, `_text`, `_bool`, ...). Without
+            // this, every array column got mapped to INT_ARRAY, so array operators (@> / <@ / &&) generated against
+            // text[] / bool[] columns produced type mismatches instead of exercising real coverage.
+            if (udtName == null) {
+                return YSQLDataType.INT_ARRAY;
+            }
+            switch (udtName) {
+            case "_text":
+            case "_varchar":
+            case "_bpchar":
+                return YSQLDataType.TEXT_ARRAY;
+            case "_bool":
+                return YSQLDataType.BOOLEAN_ARRAY;
+            default:
+                return YSQLDataType.INT_ARRAY;
+            }
+        }
         switch (typeString) {
         case "smallint":
         case "integer":
@@ -117,10 +139,6 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
         case "character":
         case "char":
             return YSQLDataType.CHAR;
-        case "ARRAY":
-            // PostgreSQL array types are reported as "ARRAY" in information_schema
-            // We'll map to INT_ARRAY as a default for now
-            return YSQLDataType.INT_ARRAY;
         default:
             throw new AssertionError(typeString);
         }
@@ -223,13 +241,14 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
     protected static List<YSQLColumn> getTableColumns(SQLConnection con, String tableName) throws SQLException {
         List<YSQLColumn> columns = new ArrayList<>();
         try (Statement s = con.createStatement()) {
-            try (ResultSet rs = s
-                    .executeQuery("select column_name, data_type from INFORMATION_SCHEMA.COLUMNS where table_name = '"
+            try (ResultSet rs = s.executeQuery(
+                    "select column_name, data_type, udt_name from INFORMATION_SCHEMA.COLUMNS where table_name = '"
                             + tableName + "' ORDER BY column_name")) {
                 while (rs.next()) {
                     String columnName = rs.getString("column_name");
                     String dataType = rs.getString("data_type");
-                    YSQLColumn c = new YSQLColumn(columnName, getColumnType(dataType));
+                    String udtName = rs.getString("udt_name");
+                    YSQLColumn c = new YSQLColumn(columnName, getColumnType(dataType, udtName));
                     columns.add(c);
                 }
             }

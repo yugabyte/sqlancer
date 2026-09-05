@@ -121,6 +121,36 @@ public class YSQLPostfixOperation implements YSQLExpression {
                 return new YSQLDataType[] { YSQLDataType.BOOLEAN };
             }
 
+        },
+        IS_NOT_TRUE("IS NOT TRUE") {
+            @Override
+            public YSQLConstant apply(YSQLConstant expectedValue) {
+                if (expectedValue.isNull()) {
+                    return YSQLConstant.createTrue();
+                }
+                return YSQLConstant.createBooleanConstant(!expectedValue.cast(YSQLDataType.BOOLEAN).asBoolean());
+            }
+
+            @Override
+            public YSQLDataType[] getInputDataTypes() {
+                return new YSQLDataType[] { YSQLDataType.BOOLEAN };
+            }
+
+        },
+        IS_NOT_FALSE("IS NOT FALSE") {
+            @Override
+            public YSQLConstant apply(YSQLConstant expectedValue) {
+                if (expectedValue.isNull()) {
+                    return YSQLConstant.createTrue();
+                }
+                return YSQLConstant.createBooleanConstant(expectedValue.cast(YSQLDataType.BOOLEAN).asBoolean());
+            }
+
+            @Override
+            public YSQLDataType[] getInputDataTypes() {
+                return new YSQLDataType[] { YSQLDataType.BOOLEAN };
+            }
+
         };
 
         private final String[] textRepresentations;

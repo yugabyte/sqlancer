@@ -142,40 +142,28 @@ public class YSQLFunction implements YSQLExpression {
             }
 
         },
-        // NULL_IF(2, "nullif") {
-        //
-        // @Override
-        // public YSQLConstant apply(YSQLConstant[] evaluatedArgs, YSQLExpression[] args) {
-        // YSQLConstant equals = evaluatedArgs[0].isEquals(evaluatedArgs[1]);
-        // if (equals.isBoolean() && equals.asBoolean()) {
-        // return YSQLConstant.createNullConstant();
-        // } else {
-        // // TODO: SELECT (nullif('1', FALSE)); yields '1', but should yield TRUE
-        // return evaluatedArgs[0];
-        // }
-        // }
-        //
-        // @Override
-        // public boolean supportsReturnType(YSQLDataType type) {
-        // return true;
-        // }
-        //
-        // @Override
-        // public YSQLDataType[] getInputTypesForReturnType(YSQLDataType returnType, int nrArguments) {
-        // return getType(nrArguments, returnType);
-        // }
-        //
-        // @Override
-        // public boolean checkArguments(YSQLExpression[] constants) {
-        // for (YSQLExpression e : constants) {
-        // if (!(e instanceof YSQLNullConstant)) {
-        // return true;
-        // }
-        // }
-        // return false;
-        // }
-        //
-        // },
+        NULL_IF(2, "nullif") {
+            @Override
+            public YSQLConstant apply(YSQLConstant[] evaluatedArgs, YSQLExpression... origArgs) {
+                YSQLConstant equals = evaluatedArgs[0].isEquals(evaluatedArgs[1]);
+                if (equals.isBoolean() && equals.asBoolean()) {
+                    return YSQLConstant.createNullConstant();
+                }
+                return evaluatedArgs[0];
+            }
+
+            @Override
+            public boolean supportsReturnType(YSQLDataType type) {
+                return type == YSQLDataType.INT || type == YSQLDataType.BOOLEAN || type == YSQLDataType.TEXT
+                        || type == YSQLDataType.NUMERIC;
+            }
+
+            @Override
+            public YSQLDataType[] getInputTypesForReturnType(YSQLDataType returnType, int nrArguments) {
+                // Both arguments must share a type for nullif's equality check to make sense.
+                return new YSQLDataType[] { returnType, returnType };
+            }
+        },
         NUM_NONNULLS(1, "num_nonnulls") {
             @Override
             public YSQLConstant apply(YSQLConstant[] args, YSQLExpression... origArgs) {
