@@ -1,6 +1,7 @@
 package sqlancer.yugabyte.ysql;
 
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLAtTimeZone;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
@@ -8,8 +9,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLDateTrunc;
 import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
@@ -31,7 +34,6 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
-import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 
 public final class YSQLExpectedValueVisitor implements YSQLVisitor {
@@ -151,9 +153,21 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
     }
 
     @Override
-    public void visit(YSQLTimezoneExtract op) {
+    public void visit(YSQLExtract op) {
         print(op);
-        visit(op.getTimeExpr());
+        visit(op.getSource());
+    }
+
+    @Override
+    public void visit(YSQLAtTimeZone op) {
+        print(op);
+        visit(op.getTime());
+    }
+
+    @Override
+    public void visit(YSQLDateTrunc op) {
+        print(op);
+        visit(op.getSource());
     }
 
     @Override

@@ -8,6 +8,7 @@ import sqlancer.Randomly;
 import sqlancer.common.visitor.BinaryOperation;
 import sqlancer.common.visitor.ToStringVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLAtTimeZone;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
@@ -15,8 +16,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLDateTrunc;
 import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
@@ -40,7 +43,6 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
-import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecBetween;
@@ -303,14 +305,35 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
     }
 
     @Override
-    public void visit(YSQLTimezoneExtract op) {
+    public void visit(YSQLExtract op) {
         sb.append("EXTRACT(");
         sb.append(op.getField());
         sb.append(" FROM (");
-        visit(op.getTimeExpr());
+        visit(op.getSource());
+        sb.append("))");
+    }
+
+    @Override
+    public void visit(YSQLAtTimeZone op) {
+        sb.append("((");
+        visit(op.getTime());
         sb.append(") AT TIME ZONE '");
         sb.append(op.getZone());
         sb.append("')");
+    }
+
+    @Override
+    public void visit(YSQLDateTrunc op) {
+        sb.append("date_trunc('");
+        sb.append(op.getField());
+        sb.append("', ");
+        visit(op.getSource());
+        if (op.getZone() != null) {
+            sb.append(", '");
+            sb.append(op.getZone());
+            sb.append("'");
+        }
+        sb.append(")");
     }
 
     @Override

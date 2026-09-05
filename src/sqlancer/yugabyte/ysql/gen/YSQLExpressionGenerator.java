@@ -19,6 +19,7 @@ import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLRowValue;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLAtTimeZone;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryArrayOperation;
@@ -31,8 +32,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConcatOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
+import sqlancer.yugabyte.ysql.ast.YSQLDateTrunc;
 import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLFunctionWithUnknownResult;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
@@ -51,7 +54,6 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
-import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLFrameSpecKind;
@@ -82,6 +84,20 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     public static YSQLExpression generateExpression(YSQLGlobalState globalState, YSQLDataType type) {
         return new YSQLExpressionGenerator(globalState).generateExpression(0, type);
+    }
+
+    // Shared EXTRACT / date_trunc field list. Casing is respected: EXTRACT takes uppercase, date_trunc takes
+    // lowercase (see the TIMESTAMPTZ case in generateExpressionInternal). Keep the fields common to timestamp,
+    // date, time and interval so composition with those source types stays legal in PG.
+    private static String randomExtractField() {
+        return Randomly.fromOptions("HOUR", "MINUTE", "SECOND", "DAY", "MONTH", "YEAR", "DOW", "DOY", "EPOCH", "WEEK",
+                "QUARTER");
+    }
+
+    // Mix of named zones (bug trigger: tserver may lack share/timezone dir under pushdown - Phorge D51850 /
+    // yugabyte-db#30815) and offset zones (control: always resolvable).
+    private static String randomTimezone() {
+        return Randomly.fromOptions("UTC", "America/New_York", "Europe/London", "Asia/Kolkata", "+00", "-05:30");
     }
 
     private static YSQLCompoundDataType getCompoundDataType(YSQLDataType type) {
@@ -451,14 +467,14 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                     new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)),
                     new YSQLCastOperation(generateExpression(depth + 1, arrayType), getCompoundDataType(arrayType)));
         case TIMESTAMP_EXTRACT:
-            // EXTRACT(<field> FROM <ts> AT TIME ZONE '<zone>') exercises DocDB expression pushdown for timezone
-            // resolution. Mix of named zones (bug trigger: tserver may lack share/timezone dir) and offsets (control).
-            String tzField = Randomly.fromOptions("HOUR", "MINUTE", "DAY", "MONTH", "YEAR", "DOW", "EPOCH");
-            String tzZone = Randomly.fromOptions("UTC", "America/New_York", "Europe/London", "Asia/Kolkata", "+00",
-                    "-05:30");
-            YSQLDataType tsType = Randomly.fromOptions(YSQLDataType.TIMESTAMPTZ, YSQLDataType.TIMESTAMP);
+            // Guaranteed-fire boost for the EXTRACT(<field> FROM <ts> AT TIME ZONE '<zone>') pattern that catches the
+            // pushdown timezone bug. Independent EXTRACT / AT TIME ZONE / date_trunc nodes also compose freely into
+            // other predicate shapes via the numeric/timestamp generation paths (see generateExpressionInternal), so
+            // the fuzzer produces this + many variants naturally.
             return new YSQLBinaryComparisonOperation(
-                    new YSQLTimezoneExtract(tzField, generateExpression(depth + 1, tsType), tzZone),
+                    new YSQLExtract(randomExtractField(),
+                            new YSQLAtTimeZone(generateExpression(depth + 1, YSQLDataType.TIMESTAMPTZ),
+                                    randomTimezone(), YSQLDataType.TIMESTAMP)),
                     generateConstant(globalState.getRandomly(), YSQLDataType.INT),
                     YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.getRandom());
         case CASE_EXPRESSION:
@@ -641,6 +657,33 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             case TEXT:
                 return generateTextExpression(depth);
             case NUMERIC:
+                // With small probability, produce EXTRACT(<field> FROM <datetime>) - lets EXTRACT compose into any
+                // numeric-typed context (arithmetic, comparison, CASE, ...) not just the TIMESTAMP_EXTRACT boost case.
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    YSQLDataType src = Randomly.fromOptions(YSQLDataType.TIMESTAMPTZ, YSQLDataType.TIMESTAMP,
+                            YSQLDataType.DATE, YSQLDataType.INTERVAL, YSQLDataType.TIME);
+                    return new YSQLExtract(randomExtractField(), generateExpression(depth + 1, src));
+                }
+                return generateConstant(r, dataType);
+            case TIMESTAMPTZ:
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    // <TIMESTAMP> AT TIME ZONE '<zone>' returns TIMESTAMPTZ.
+                    return new YSQLAtTimeZone(generateExpression(depth + 1, YSQLDataType.TIMESTAMP), randomTimezone(),
+                            YSQLDataType.TIMESTAMPTZ);
+                }
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    return new YSQLDateTrunc(randomExtractField().toLowerCase(),
+                            generateExpression(depth + 1, YSQLDataType.TIMESTAMPTZ),
+                            Randomly.getBoolean() ? randomTimezone() : null, YSQLDataType.TIMESTAMPTZ);
+                }
+                return generateConstant(r, dataType);
+            case TIMESTAMP:
+                if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
+                    // <TIMESTAMPTZ> AT TIME ZONE '<zone>' returns TIMESTAMP.
+                    return new YSQLAtTimeZone(generateExpression(depth + 1, YSQLDataType.TIMESTAMPTZ), randomTimezone(),
+                            YSQLDataType.TIMESTAMP);
+                }
+                return generateConstant(r, dataType);
             case DECIMAL:
             case REAL:
             case DOUBLE_PRECISION:
@@ -648,8 +691,6 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             case MONEY:
             case DATE:
             case TIME:
-            case TIMESTAMP:
-            case TIMESTAMPTZ:
             case INTERVAL:
             case INET:
             case CIDR:

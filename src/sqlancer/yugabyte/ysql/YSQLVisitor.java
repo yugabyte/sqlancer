@@ -5,6 +5,7 @@ import java.util.List;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.ast.YSQLAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLAtTimeZone;
 import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
@@ -12,8 +13,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
+import sqlancer.yugabyte.ysql.ast.YSQLDateTrunc;
 import sqlancer.yugabyte.ysql.ast.YSQLExistsSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
@@ -35,7 +38,6 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
-import sqlancer.yugabyte.ysql.ast.YSQLTimezoneExtract;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 
@@ -88,7 +90,11 @@ public interface YSQLVisitor {
 
     void visit(YSQLLikeOperation op);
 
-    void visit(YSQLTimezoneExtract op);
+    void visit(YSQLExtract op);
+
+    void visit(YSQLAtTimeZone op);
+
+    void visit(YSQLDateTrunc op);
 
     void visit(YSQLPOSIXRegularExpression op);
 
@@ -153,8 +159,12 @@ public interface YSQLVisitor {
             visit((YSQLSimilarTo) expression);
         } else if (expression instanceof YSQLLikeOperation) {
             visit((YSQLLikeOperation) expression);
-        } else if (expression instanceof YSQLTimezoneExtract) {
-            visit((YSQLTimezoneExtract) expression);
+        } else if (expression instanceof YSQLExtract) {
+            visit((YSQLExtract) expression);
+        } else if (expression instanceof YSQLAtTimeZone) {
+            visit((YSQLAtTimeZone) expression);
+        } else if (expression instanceof YSQLDateTrunc) {
+            visit((YSQLDateTrunc) expression);
         } else if (expression instanceof YSQLPOSIXRegularExpression) {
             visit((YSQLPOSIXRegularExpression) expression);
         } else if (expression instanceof YSQLFromTable) {
