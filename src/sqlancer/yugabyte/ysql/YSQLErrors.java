@@ -221,6 +221,9 @@ public final class YSQLErrors {
         // etc., which fail resolution. Legitimate PG behavior, not a bug.
         errors.add("cannot be matched");
         errors.add("invalid regular expression");
+        // SUBSTRING(x FROM 'pattern' [FOR 'escape']) regex form rejects ill-formed escape or pattern strings that
+        // the fuzzer happily generates. Legitimate PG behavior.
+        errors.add("invalid escape string");
         errors.add("LIKE pattern must not end with escape character");
         errors.add("could not determine which collation to use");
         errors.add("invalid input syntax for integer");

@@ -32,7 +32,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLJoin.YSQLJoinType;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLOverlay;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLPosition;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
@@ -43,6 +45,8 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLSubstringGrammar;
+import sqlancer.yugabyte.ysql.ast.YSQLTrimGrammar;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecBetween;
@@ -332,6 +336,61 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             sb.append(", '");
             sb.append(op.getZone());
             sb.append("'");
+        }
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLSubstringGrammar op) {
+        sb.append("SUBSTRING(");
+        visit(op.getString());
+        sb.append(" FROM ");
+        visit(op.getFrom());
+        if (op.getLen() != null) {
+            sb.append(" FOR ");
+            visit(op.getLen());
+        }
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLPosition op) {
+        sb.append("POSITION(");
+        visit(op.getNeedle());
+        sb.append(" IN ");
+        visit(op.getHaystack());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLTrimGrammar op) {
+        sb.append("TRIM(");
+        if (op.getSide() != null) {
+            sb.append(op.getSide().name());
+            sb.append(" ");
+        }
+        if (op.getChars() != null) {
+            visit(op.getChars());
+            sb.append(" ");
+        }
+        if (op.getSide() != null || op.getChars() != null) {
+            sb.append("FROM ");
+        }
+        visit(op.getString());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLOverlay op) {
+        sb.append("OVERLAY(");
+        visit(op.getString());
+        sb.append(" PLACING ");
+        visit(op.getReplacement());
+        sb.append(" FROM ");
+        visit(op.getFrom());
+        if (op.getLen() != null) {
+            sb.append(" FOR ");
+            visit(op.getLen());
         }
         sb.append(")");
     }

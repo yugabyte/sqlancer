@@ -23,7 +23,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLOverlay;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLPosition;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
@@ -34,6 +36,8 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLSubstringGrammar;
+import sqlancer.yugabyte.ysql.ast.YSQLTrimGrammar;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 
 public final class YSQLExpectedValueVisitor implements YSQLVisitor {
@@ -168,6 +172,31 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
     public void visit(YSQLDateTrunc op) {
         print(op);
         visit(op.getSource());
+    }
+
+    @Override
+    public void visit(YSQLSubstringGrammar op) {
+        print(op);
+        visit(op.getString());
+    }
+
+    @Override
+    public void visit(YSQLPosition op) {
+        print(op);
+        visit(op.getNeedle());
+        visit(op.getHaystack());
+    }
+
+    @Override
+    public void visit(YSQLTrimGrammar op) {
+        print(op);
+        visit(op.getString());
+    }
+
+    @Override
+    public void visit(YSQLOverlay op) {
+        print(op);
+        visit(op.getString());
     }
 
     @Override

@@ -27,7 +27,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLOverlay;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLPosition;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
@@ -38,6 +40,8 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLSubstringGrammar;
+import sqlancer.yugabyte.ysql.ast.YSQLTrimGrammar;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 
@@ -130,6 +134,14 @@ public interface YSQLVisitor {
 
     void visit(YSQLOrderedSetAggregate op);
 
+    void visit(YSQLSubstringGrammar op);
+
+    void visit(YSQLPosition op);
+
+    void visit(YSQLTrimGrammar op);
+
+    void visit(YSQLOverlay op);
+
     default void visit(YSQLExpression expression) {
         if (expression instanceof YSQLConstant) {
             visit((YSQLConstant) expression);
@@ -197,6 +209,14 @@ public interface YSQLVisitor {
             visit((YSQLGroupingFunction) expression);
         } else if (expression instanceof YSQLOrderedSetAggregate) {
             visit((YSQLOrderedSetAggregate) expression);
+        } else if (expression instanceof YSQLSubstringGrammar) {
+            visit((YSQLSubstringGrammar) expression);
+        } else if (expression instanceof YSQLPosition) {
+            visit((YSQLPosition) expression);
+        } else if (expression instanceof YSQLTrimGrammar) {
+            visit((YSQLTrimGrammar) expression);
+        } else if (expression instanceof YSQLOverlay) {
+            visit((YSQLOverlay) expression);
         } else {
             throw new AssertionError(expression);
         }

@@ -45,7 +45,9 @@ import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
+import sqlancer.yugabyte.ysql.ast.YSQLOverlay;
 import sqlancer.yugabyte.ysql.ast.YSQLPOSIXRegularExpression;
+import sqlancer.yugabyte.ysql.ast.YSQLPosition;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
@@ -54,6 +56,8 @@ import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSimilarTo;
+import sqlancer.yugabyte.ysql.ast.YSQLSubstringGrammar;
+import sqlancer.yugabyte.ysql.ast.YSQLTrimGrammar;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLFrameSpecKind;
@@ -803,9 +807,26 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return generateConcat(depth);
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.TEXT);
+        case SUBSTRING_GRAMMAR:
+            return new YSQLSubstringGrammar(generateExpression(depth + 1, YSQLDataType.TEXT),
+                    generateExpression(depth + 1, YSQLDataType.INT),
+                    Randomly.getBoolean() ? generateExpression(depth + 1, YSQLDataType.INT) : null);
+        case TRIM_GRAMMAR:
+            return generateTrimGrammar(depth);
+        case OVERLAY_GRAMMAR:
+            return new YSQLOverlay(generateExpression(depth + 1, YSQLDataType.TEXT),
+                    generateExpression(depth + 1, YSQLDataType.TEXT), generateExpression(depth + 1, YSQLDataType.INT),
+                    Randomly.getBoolean() ? generateExpression(depth + 1, YSQLDataType.INT) : null);
         default:
             throw new AssertionError();
         }
+    }
+
+    private YSQLExpression generateTrimGrammar(int depth) {
+        YSQLTrimGrammar.TrimSide side = Randomly.getBoolean() ? null : Randomly.fromOptions(
+                YSQLTrimGrammar.TrimSide.LEADING, YSQLTrimGrammar.TrimSide.TRAILING, YSQLTrimGrammar.TrimSide.BOTH);
+        YSQLExpression chars = Randomly.getBoolean() ? generateExpression(depth + 1, YSQLDataType.TEXT) : null;
+        return new YSQLTrimGrammar(side, chars, generateExpression(depth + 1, YSQLDataType.TEXT));
     }
 
     private YSQLExpression generateConcat(int depth) {
@@ -1045,6 +1066,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return new YSQLFunction("yb_hash_code", YSQLDataType.INT, generateExpression(depth + 1));
         case SCALAR_SUBQUERY:
             return new YSQLScalarSubquery(createSubquerySelect(1, YSQLDataType.INT), YSQLDataType.INT);
+        case POSITION_GRAMMAR:
+            return new YSQLPosition(generateExpression(depth + 1, YSQLDataType.TEXT),
+                    generateExpression(depth + 1, YSQLDataType.TEXT));
         default:
             throw new AssertionError();
         }
@@ -1247,7 +1271,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     private enum TextExpression {
-        CAST, FUNCTION, CONCAT, CASE_EXPRESSION
+        CAST, FUNCTION, CONCAT, CASE_EXPRESSION, SUBSTRING_GRAMMAR, TRIM_GRAMMAR, OVERLAY_GRAMMAR
     }
 
     private enum BitExpression {
@@ -1255,7 +1279,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     private enum IntExpression {
-        UNARY_OPERATION, FUNCTION, CAST, BINARY_ARITHMETIC_EXPRESSION, CASE_EXPRESSION, YB_HASH_CODE, SCALAR_SUBQUERY
+        UNARY_OPERATION, FUNCTION, CAST, BINARY_ARITHMETIC_EXPRESSION, CASE_EXPRESSION, YB_HASH_CODE, SCALAR_SUBQUERY,
+        POSITION_GRAMMAR
     }
 
 }
