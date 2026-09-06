@@ -101,6 +101,12 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_network_fetch_cost=1000000" }, //
             { "yb_parallel_range_size=1024" }, //
             { "yb_use_cluster_config_for_geolocation_costing=on" }, //
+            // New in yugabyte-db master (Aug-Sep 2026). Each is a QUERY_TUNING_* result-preserving knob (plan or
+            // internal-RPC choice, never the row set), flipped to its non-default state.
+            { "yb_enable_index_backfill_scan_optimization=off" }, // recently default-on (YB #33649)
+            { "yb_disable_parallel_query_in_ddl=on" }, //
+            { "yb_enable_parallel_scan_system=on" }, //
+            { "yb_plpgsql_disable_prefetch_in_for_query=on" }, //
     };
 
     private final YSQLGlobalState state;
