@@ -51,6 +51,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLPosition;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLRowComparison;
 import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
@@ -66,6 +67,12 @@ import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctio
 import sqlancer.yugabyte.ysql.ast.YSQLWindowFunctionExpression.YSQLWindowFunctionFrameSpecTerm.YSQLWindowFunctionFrameSpecTermKind;
 
 public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpression> {
+
+    private static final YSQLDataType[] COMPARISON_SAFE_TYPES = { YSQLDataType.SMALLINT, YSQLDataType.INT,
+            YSQLDataType.BIGINT, YSQLDataType.NUMERIC, YSQLDataType.DECIMAL, YSQLDataType.REAL,
+            YSQLDataType.DOUBLE_PRECISION, YSQLDataType.FLOAT, YSQLDataType.VARCHAR, YSQLDataType.CHAR,
+            YSQLDataType.TEXT, YSQLDataType.DATE, YSQLDataType.TIME, YSQLDataType.TIMESTAMP, YSQLDataType.TIMESTAMPTZ,
+            YSQLDataType.INTERVAL, YSQLDataType.BOOLEAN, YSQLDataType.MONEY, YSQLDataType.BYTEA };
 
     private final int maxDepth;
 
@@ -433,12 +440,25 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             validOptions.remove(BooleanExpression.IN_SUBQUERY);
             validOptions.remove(BooleanExpression.QUANTIFIED_COMPARISON);
         }
+        if (columns == null || columns.isEmpty() || globalState == null || globalState.isPgCompatible()) {
+            validOptions.remove(BooleanExpression.HASH_CODE_RANGE);
+        }
+        if (expectedResult || YSQLProvider.generateOnlyKnown) {
+            // PQS requires Java-side expected values.
+            validOptions.remove(BooleanExpression.ROW_COMPARISON);
+            validOptions.remove(BooleanExpression.HASH_CODE_RANGE);
+        }
+        if (getComparisonSafeColumns().isEmpty()) {
+            validOptions.remove(BooleanExpression.ORM_PREDICATE);
+        }
         BooleanExpression option = Randomly.fromList(validOptions);
         switch (option) {
         case POSTFIX_OPERATOR:
             YSQLPostfixOperation.PostfixOperator random = YSQLPostfixOperation.PostfixOperator.getRandom();
             return YSQLPostfixOperation
                     .create(generateExpression(depth + 1, Randomly.fromOptions(random.getInputDataTypes())), random);
+        case ORM_PREDICATE:
+            return generateOrmPredicate();
         case IN_OPERATION:
             return inOperation(depth + 1);
         case NOT:
@@ -509,6 +529,10 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return generateInSubquery(depth);
         case QUANTIFIED_COMPARISON:
             return generateQuantifiedComparison(depth);
+        case ROW_COMPARISON:
+            return generateRowComparison(depth);
+        case HASH_CODE_RANGE:
+            return generateHashCodeRange();
         default:
             throw new AssertionError();
         }
@@ -524,23 +548,24 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         }
     }
 
-    private YSQLDataType getComparisonSafeType() {
-        YSQLDataType[] comparisonSafeTypes = { YSQLDataType.SMALLINT, YSQLDataType.INT, YSQLDataType.BIGINT,
-                YSQLDataType.NUMERIC, YSQLDataType.DECIMAL, YSQLDataType.REAL, YSQLDataType.DOUBLE_PRECISION,
-                YSQLDataType.FLOAT, YSQLDataType.VARCHAR, YSQLDataType.CHAR, YSQLDataType.TEXT, YSQLDataType.DATE,
-                YSQLDataType.TIME, YSQLDataType.TIMESTAMP, YSQLDataType.TIMESTAMPTZ, YSQLDataType.INTERVAL,
-                YSQLDataType.BOOLEAN, YSQLDataType.MONEY };
+    private boolean isComparisonSafe(YSQLDataType type) {
+        for (YSQLDataType safeType : COMPARISON_SAFE_TYPES) {
+            if (type == safeType) {
+                return true;
+            }
+        }
+        return false;
+    }
 
+    private YSQLDataType getComparisonSafeType() {
         if (columns != null && !columns.isEmpty() && Randomly.getBoolean()) {
             YSQLDataType columnType = Randomly.fromList(columns).getType();
-            for (YSQLDataType safeType : comparisonSafeTypes) {
-                if (columnType == safeType) {
-                    return columnType;
-                }
+            if (isComparisonSafe(columnType)) {
+                return columnType;
             }
         }
 
-        return Randomly.fromOptions(comparisonSafeTypes);
+        return Randomly.fromOptions(COMPARISON_SAFE_TYPES);
     }
 
     private YSQLExpression generateFunction(int depth, YSQLDataType type) {
@@ -562,14 +587,168 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                 YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.getRandom());
     }
 
+    public YSQLExpression generateOrmPredicate() {
+        if (getComparisonSafeColumns().isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        YSQLColumn column = Randomly.fromList(getComparisonSafeColumns());
+        YSQLExpression value = YSQLColumnValue.create(column, rw == null ? null : rw.getValues().get(column));
+        YSQLExpression parameter = generateConstant(r, column.getType());
+        YSQLExpression equality = new YSQLBinaryComparisonOperation(value, parameter,
+                YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.EQUALS);
+        int pattern = Randomly.fromOptions(0, 1, 2, 3, 4, 5);
+        switch (pattern) {
+        case 0:
+            return new YSQLBinaryComparisonOperation(value, value,
+                    Randomly.fromOptions(YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.EQUALS,
+                            YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.NOT_EQUALS,
+                            YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.IS_NOT_DISTINCT));
+        case 1:
+            return new YSQLBinaryLogicalOperation(
+                    new YSQLPostfixOperation(parameter, YSQLPostfixOperation.PostfixOperator.IS_NULL), equality,
+                    YSQLBinaryLogicalOperation.BinaryLogicalOperator.OR);
+        case 2:
+            return new YSQLBinaryLogicalOperation(equality,
+                    new YSQLBinaryLogicalOperation(
+                            new YSQLPostfixOperation(value, YSQLPostfixOperation.PostfixOperator.IS_NULL),
+                            new YSQLPostfixOperation(parameter, YSQLPostfixOperation.PostfixOperator.IS_NULL),
+                            YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND),
+                    YSQLBinaryLogicalOperation.BinaryLogicalOperator.OR);
+        case 3:
+        case 5:
+            List<YSQLColumn> nextColumns = getComparisonSafeColumns().stream()
+                    .filter(c -> c != column && c.getTable() == column.getTable()).collect(Collectors.toList());
+            if (nextColumns.isEmpty()) {
+                return equality;
+            }
+            YSQLColumn next = Randomly.fromList(nextColumns);
+            YSQLExpression nextValue = YSQLColumnValue.create(next, rw == null ? null : rw.getValues().get(next));
+            if (pattern == 5) {
+                return new YSQLBinaryLogicalOperation(equality,
+                        new YSQLBinaryComparisonOperation(nextValue, generateConstant(r, next.getType()),
+                                YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.EQUALS),
+                        YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND);
+            }
+            YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator direction = Randomly.fromOptions(
+                    YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.GREATER,
+                    YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.LESS);
+            return new YSQLBinaryLogicalOperation(new YSQLBinaryComparisonOperation(value, parameter, direction),
+                    new YSQLBinaryLogicalOperation(equality,
+                            new YSQLBinaryComparisonOperation(nextValue, generateConstant(r, next.getType()),
+                                    direction),
+                            YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND),
+                    YSQLBinaryLogicalOperation.BinaryLogicalOperator.OR);
+        case 4:
+            return new YSQLInOperation(value,
+                    Arrays.asList(parameter, generateConstant(r, column.getType()), parameter,
+                            Randomly.getBoolean() ? parameter : YSQLConstant.createNullConstant()),
+                    Randomly.getBoolean());
+        default:
+            throw new AssertionError();
+        }
+    }
+
     private YSQLExpression inOperation(int depth) {
-        YSQLDataType type = YSQLDataType.getRandomType();
-        YSQLExpression leftExpr = generateExpression(depth + 1, type);
+        YSQLDataType type = getMeaningfulType();
+        List<YSQLColumn> candidates = getColumnsOfType(type);
+        YSQLExpression leftExpr = expectedResult || candidates.isEmpty() || Randomly.getBoolean()
+                ? generateExpression(depth + 1, type) : createColumnOfType(type);
+        YSQLDataType elementType = expectedResult || YSQLProvider.generateOnlyKnown ? type : getCrossType(type);
         List<YSQLExpression> rightExpr = new ArrayList<>();
         for (int i = 0; i < Randomly.smallNumber() + 1; i++) {
-            rightExpr.add(generateExpression(depth + 1, type));
+            YSQLExpression element = generateExpression(depth + 1, elementType);
+            if (elementType != type) {
+                // Prevent unknown literals from being coerced to the column type.
+                element = new YSQLCastOperation(element, getCompoundDataType(elementType));
+            }
+            rightExpr.add(element);
         }
         return new YSQLInOperation(leftExpr, rightExpr, Randomly.getBoolean());
+    }
+
+    private YSQLDataType getCrossType(YSQLDataType type) {
+        if (!Randomly.getBooleanWithRatherLowProbability()) {
+            return type;
+        }
+        YSQLDataType[] family;
+        switch (type) {
+        case SMALLINT:
+        case INT:
+        case BIGINT:
+        case NUMERIC:
+        case DECIMAL:
+            family = new YSQLDataType[] { YSQLDataType.SMALLINT, YSQLDataType.INT, YSQLDataType.BIGINT,
+                    YSQLDataType.NUMERIC, YSQLDataType.DECIMAL };
+            break;
+        case VARCHAR:
+        case TEXT:
+            family = new YSQLDataType[] { YSQLDataType.VARCHAR, YSQLDataType.TEXT };
+            break;
+        default:
+            return type;
+        }
+        return Randomly.fromOptions(family);
+    }
+
+    private YSQLExpression generateRowComparison(int depth) {
+        int arity = Randomly.fromOptions(2, 3);
+        List<YSQLExpression> left = new ArrayList<>();
+        List<YSQLExpression> right = new ArrayList<>();
+        List<YSQLColumn> keyColumns = getComparisonSafeColumns();
+        boolean useColumns = keyColumns.size() >= arity;
+        int firstColumn = useColumns ? r.getInteger(0, keyColumns.size() - arity + 1) : 0;
+        for (int i = 0; i < arity; i++) {
+            YSQLDataType type;
+            if (useColumns) {
+                YSQLColumn column = keyColumns.get(firstColumn + i);
+                type = column.getType();
+                left.add(YSQLColumnValue.create(column, null));
+            } else {
+                type = getComparisonSafeType();
+                left.add(generateExpression(depth + 1, type));
+            }
+            if (Randomly.getBooleanWithRatherLowProbability()) {
+                right.add(YSQLConstant.createNullConstant());
+            } else if (useColumns) {
+                right.add(generateConstant(r, type));
+            } else {
+                right.add(generateExpression(depth + 1, type));
+            }
+        }
+        return new YSQLRowComparison(left, right, YSQLRowComparison.RowComparisonOperator.getRandom());
+    }
+
+    private List<YSQLColumn> getComparisonSafeColumns() {
+        if (columns == null) {
+            return Collections.emptyList();
+        }
+        return columns.stream().filter(c -> isComparisonSafe(c.getType())).collect(Collectors.toList());
+    }
+
+    private List<YSQLColumn> getColumnsOfType(YSQLDataType type) {
+        if (columns == null) {
+            return Collections.emptyList();
+        }
+        return columns.stream().filter(c -> c.getType() == type).collect(Collectors.toList());
+    }
+
+    private YSQLExpression generateHashCodeRange() {
+        int nrArgs = columns.size() > 1 && Randomly.getBoolean() ? 2 : 1;
+        YSQLExpression[] args = new YSQLExpression[nrArgs];
+        for (int i = 0; i < nrArgs; i++) {
+            args[i] = YSQLColumnValue.create(Randomly.fromList(columns), null);
+        }
+        YSQLExpression hashCode = new YSQLFunction("yb_hash_code", YSQLDataType.INT, args);
+        long firstBound = r.getInteger(0, 65537);
+        long secondBound = r.getInteger(0, 65537);
+        YSQLExpression lowerBound = new YSQLBinaryComparisonOperation(hashCode,
+                YSQLConstant.createIntConstant(Math.min(firstBound, secondBound)),
+                YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.GREATER_EQUALS);
+        YSQLExpression upperBound = new YSQLBinaryComparisonOperation(hashCode,
+                YSQLConstant.createIntConstant(Math.max(firstBound, secondBound)),
+                YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.LESS);
+        return new YSQLBinaryLogicalOperation(lowerBound, upperBound,
+                YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND);
     }
 
     private YSQLExpression generateInSubquery(int depth) {
@@ -1090,8 +1269,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     }
 
     public YSQLExpression generateExpressionWithExpectedResult(YSQLDataType type) {
-        this.expectedResult = true;
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(globalState).setColumns(columns).setRowValue(rw);
+        gen.expectedResult = true;
         YSQLExpression expr;
         do {
             expr = gen.generateExpression(type);
@@ -1263,7 +1442,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
         SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, TIMESTAMP_EXTRACT, CASE_EXPRESSION,
-        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON
+        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON, ROW_COMPARISON, HASH_CODE_RANGE, ORM_PREDICATE
     }
 
     private enum RangeExpression {

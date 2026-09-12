@@ -50,6 +50,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLGrantRevokeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLLockTableGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
 import sqlancer.yugabyte.ysql.gen.YSQLMergeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLNotifyGenerator;
@@ -177,6 +178,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             break;
         case REFRESH_VIEW:
             nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 20);
+            break;
+        case CREATE_MATERIALIZED_VIEW_INDEX:
+            nrPerformed = r.getInteger(0, 25);
             break;
         case UPDATE:
             nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 20);
@@ -639,6 +643,7 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_SEQUENCE(YSQLSequenceGenerator::createSequence), //
         CREATE_VIEW(YSQLViewGenerator::create), //
         REFRESH_VIEW(YSQLMaterializedViewRefresh::create), //
+        CREATE_MATERIALIZED_VIEW_INDEX(YSQLMaterializedViewIndexGenerator::create), //
         PARALLEL_QUERY_TEST(YSQLParallelQueryGenerator::generateParallelQueryTest), //
         ALTER_DATABASE(YSQLAlterDatabaseGenerator::create), //
         SAVEPOINT(YSQLSavepointGenerator::generate), //

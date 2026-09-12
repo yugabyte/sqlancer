@@ -58,8 +58,10 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
         YSQLErrors.addSubqueryErrors(errors);
         if (!Randomly.getBooleanWithSmallProbability()) {
             sb.append(" WHERE ");
-            YSQLExpression where = YSQLExpressionGenerator.generateExpression(globalState, randomTable.getColumns(),
-                    YSQLDataType.BOOLEAN);
+            YSQLExpressionGenerator generator = new YSQLExpressionGenerator(globalState)
+                    .setColumns(randomTable.getColumns());
+            YSQLExpression where = Randomly.getBooleanWithRatherLowProbability() ? generator.generateOrmPredicate()
+                    : generator.generateExpression(YSQLDataType.BOOLEAN);
             sb.append(YSQLVisitor.asString(where));
         }
     }
@@ -67,6 +69,37 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
     @Override
     protected void updateValue(YSQLColumn column) {
         YSQLDataType type = column.getType();
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            String name = column.getName();
+            switch (Randomly.fromOptions(0, 1, 2)) {
+            case 0:
+                sb.append(name);
+                break;
+            case 1:
+                sb.append("COALESCE(");
+                sb.append(YSQLVisitor
+                        .asString(YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), type)));
+                sb.append(", ").append(name).append(")");
+                break;
+            case 2:
+                sb.append("CASE WHEN ");
+                sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState,
+                        randomTable.getColumns(), YSQLDataType.BOOLEAN)));
+                sb.append(" THEN ");
+                sb.append(YSQLVisitor
+                        .asString(YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), type)));
+                sb.append(" ELSE ").append(name).append(" END");
+                break;
+            default:
+                throw new AssertionError();
+            }
+            return;
+        }
+        if ((type == YSQLDataType.SMALLINT || type == YSQLDataType.INT || type == YSQLDataType.BIGINT)
+                && Randomly.getBooleanWithRatherLowProbability()) {
+            sb.append(column.getName()).append(Randomly.fromOptions(" + 1", " - 1"));
+            return;
+        }
         // For special types that can't be cast from arbitrary expressions, use constants
         boolean isSpecialType = type == YSQLDataType.RANGE || type == YSQLDataType.INT4RANGE
                 || type == YSQLDataType.INT8RANGE || type == YSQLDataType.NUMRANGE || type == YSQLDataType.TSRANGE

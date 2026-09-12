@@ -34,6 +34,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLRowComparison;
 import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
@@ -142,6 +143,8 @@ public interface YSQLVisitor {
 
     void visit(YSQLOverlay op);
 
+    void visit(YSQLRowComparison op);
+
     default void visit(YSQLExpression expression) {
         if (expression instanceof YSQLConstant) {
             visit((YSQLConstant) expression);
@@ -217,6 +220,8 @@ public interface YSQLVisitor {
             visit((YSQLTrimGrammar) expression);
         } else if (expression instanceof YSQLOverlay) {
             visit((YSQLOverlay) expression);
+        } else if (expression instanceof YSQLRowComparison) {
+            visit((YSQLRowComparison) expression);
         } else {
             throw new AssertionError(expression);
         }

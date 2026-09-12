@@ -173,13 +173,14 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
                 }
             }
             try (Statement s = con.createStatement()) {
-                try (ResultSet rs = s.executeQuery("select relname from pg_class where relkind = 'm';")) {
+                try (ResultSet rs = s.executeQuery(
+                        "select relname from pg_class where relkind = 'm' and relnamespace = 'public'::regnamespace order by relname;")) {
                     while (rs.next()) {
                         String tableName = rs.getString("relname");
                         boolean isInsertable = false;
-                        List<YSQLColumn> databaseColumns = getTableColumns(con, tableName);
+                        List<YSQLColumn> databaseColumns = getMaterializedViewColumns(con, tableName);
                         List<YSQLStatisticsObject> statistics = getStatistics(con);
-                        YSQLTable t = new YSQLTable(tableName, databaseColumns, new ArrayList<>(),
+                        YSQLTable t = new YSQLTable(tableName, databaseColumns, getIndexes(con, tableName),
                                 YSQLTable.TableType.MATERIALIZED_VIEW, statistics, false, isInsertable);
                         for (YSQLColumn c : databaseColumns) {
                             c.setTable(t);
@@ -250,6 +251,30 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
                     String udtName = rs.getString("udt_name");
                     YSQLColumn c = new YSQLColumn(columnName, getColumnType(dataType, udtName));
                     columns.add(c);
+                }
+            }
+        }
+        return columns;
+    }
+
+    // Materialized views are absent from information_schema.columns.
+    protected static List<YSQLColumn> getMaterializedViewColumns(SQLConnection con, String viewName)
+            throws SQLException {
+        List<YSQLColumn> columns = new ArrayList<>();
+        try (Statement s = con.createStatement()) {
+            try (ResultSet rs = s.executeQuery(
+                    "select a.attname as column_name, case when t.typcategory = 'A' then 'ARRAY' else format_type(a.atttypid, NULL) end as data_type, t.typname as udt_name"
+                            + " from pg_attribute a join pg_class c on c.oid = a.attrelid"
+                            + " join pg_type t on t.oid = a.atttypid where c.relname = '" + viewName + "'"
+                            + " and c.relkind = 'm' and c.relnamespace = 'public'::regnamespace and a.attnum > 0 and not a.attisdropped order by a.attname")) {
+                while (rs.next()) {
+                    String columnName = rs.getString("column_name");
+                    try {
+                        columns.add(new YSQLColumn(columnName,
+                                getColumnType(rs.getString("data_type"), rs.getString("udt_name"))));
+                    } catch (AssertionError e) {
+                        // Skip unsupported column types.
+                    }
                 }
             }
         }

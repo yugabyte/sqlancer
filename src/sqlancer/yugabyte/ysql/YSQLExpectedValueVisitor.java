@@ -30,6 +30,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLRowComparison;
 import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
@@ -197,6 +198,17 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
     public void visit(YSQLOverlay op) {
         print(op);
         visit(op.getString());
+    }
+
+    @Override
+    public void visit(YSQLRowComparison op) {
+        print(op);
+        for (YSQLExpression element : op.getLeft()) {
+            visit(element);
+        }
+        for (YSQLExpression element : op.getRight()) {
+            visit(element);
+        }
     }
 
     @Override

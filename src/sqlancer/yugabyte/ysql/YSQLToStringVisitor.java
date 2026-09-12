@@ -39,6 +39,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLPostfixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLPostfixText;
 import sqlancer.yugabyte.ysql.ast.YSQLPrefixOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLQuantifiedComparison;
+import sqlancer.yugabyte.ysql.ast.YSQLRowComparison;
 import sqlancer.yugabyte.ysql.ast.YSQLScalarSubquery;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
@@ -391,6 +392,28 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         if (op.getLen() != null) {
             sb.append(" FOR ");
             visit(op.getLen());
+        }
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLRowComparison op) {
+        sb.append("(");
+        visitRowSide(op.getLeft());
+        sb.append(" ");
+        sb.append(op.getOp().getTextRepresentation());
+        sb.append(" ");
+        visitRowSide(op.getRight());
+        sb.append(")");
+    }
+
+    private void visitRowSide(List<YSQLExpression> elements) {
+        sb.append("(");
+        for (int i = 0; i < elements.size(); i++) {
+            if (i != 0) {
+                sb.append(", ");
+            }
+            visit(elements.get(i));
         }
         sb.append(")");
     }
