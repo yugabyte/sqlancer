@@ -15,12 +15,14 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
+import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLMergeScanQueryGenerator;
 
 /**
  * Differential oracle that runs the same query twice, the second time with a result-preserving YugabyteDB planner GUC
@@ -150,13 +152,20 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             select.setWhereClause(gen.generateExpression(0, YSQLDataType.BOOLEAN));
         }
         String queryString = YSQLVisitor.asString(select);
+        List<YSQLTable> bucketTables = state.getSchema().getDatabaseTables().stream()
+                .filter(YSQLMergeScanQueryGenerator::isCandidate).collect(Collectors.toList());
+        if (!state.isPgCompatible() && !bucketTables.isEmpty() && Randomly.getBoolean()) {
+            queryString = YSQLMergeScanQueryGenerator.generate(Randomly.fromList(bucketTables));
+        }
 
+        capturePlan(queryString, "default");
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
         String[] flip = Randomly.fromOptions(GUC_FLIPS);
         List<String> flippedResult;
-        applyGuc(flip, true);
         try {
+            applyGuc(flip, true);
+            capturePlan(queryString, String.join(", ", flip));
             flippedResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
         } finally {
             applyGuc(flip, false);
@@ -168,6 +177,14 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         }
         combined.add(queryString);
         ComparatorHelper.assumeResultSetsAreEqual(defaultResult, flippedResult, queryString, combined, state);
+    }
+
+    private void capturePlan(String query, String configuration) throws SQLException {
+        String explain = "EXPLAIN (VERBOSE, COSTS OFF) " + query;
+        state.getState().getLocalState().log(explain);
+        List<String> plan = ComparatorHelper.getResultSetFirstColumnAsString(explain, errors, state);
+        state.getState().getLocalState()
+                .log("-- " + configuration + "\n-- " + String.join("\n", plan).replace("\n", "\n-- "));
     }
 
     private void applyGuc(String[] flip, boolean set) throws SQLException {

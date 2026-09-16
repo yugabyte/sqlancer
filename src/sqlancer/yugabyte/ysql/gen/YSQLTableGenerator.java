@@ -75,6 +75,9 @@ public class YSQLTableGenerator {
     }
 
     private SQLQueryAdapter generate() {
+        if (!globalState.isPgCompatible() && !generateOnlyKnown && Randomly.getBooleanWithRatherLowProbability()) {
+            return generateHashBucketTable(tableName);
+        }
         columnCanHavePrimaryKey = true;
         sb.append("CREATE");
 
@@ -97,6 +100,13 @@ public class YSQLTableGenerator {
         sb.append(tableName);
         createStandard();
         return new SQLQueryAdapter(sb.toString(), errors, true);
+    }
+
+    public static SQLQueryAdapter generateHashBucketTable(String tableName) {
+        int buckets = Randomly.fromOptions(2, 3, 4, 8);
+        return new SQLQueryAdapter("CREATE TABLE " + tableName
+                + " (c0 int, c1 int, c2 int, c3 int, c4 int GENERATED ALWAYS AS (yb_hash_code(c0) % " + buckets
+                + ") STORED, PRIMARY KEY (c4 ASC, c1 ASC, c2 ASC))", true);
     }
 
     private void createStandard() throws AssertionError {

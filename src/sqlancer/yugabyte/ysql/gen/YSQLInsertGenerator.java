@@ -73,6 +73,10 @@ public final class YSQLInsertGenerator {
                 if (i != 0) {
                     sbRowValue.append(", ");
                 }
+                if (columns.get(i).isGenerated()) {
+                    sbRowValue.append("DEFAULT");
+                    continue;
+                }
                 sbRowValue.append(YSQLVisitor.asString(
                         YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), columns.get(i).getType())));
             }
@@ -113,7 +117,9 @@ public final class YSQLInsertGenerator {
                     }
                     YSQLColumn col = updateColumns.get(i);
                     sb.append(col.getName()).append(" = ");
-                    if (Randomly.getBoolean()) {
+                    if (col.isGenerated()) {
+                        sb.append("DEFAULT");
+                    } else if (Randomly.getBoolean()) {
                         sb.append("EXCLUDED.").append(col.getName());
                     } else {
                         YSQLExpression expr = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(),
@@ -151,7 +157,9 @@ public final class YSQLInsertGenerator {
             if (i != 0) {
                 sb.append(", ");
             }
-            if (!Randomly.getBooleanWithSmallProbability() || !canBeDefault) {
+            if (columns.get(i).isGenerated()) {
+                sb.append("DEFAULT");
+            } else if (!Randomly.getBooleanWithSmallProbability() || !canBeDefault) {
                 YSQLExpression generateConstant;
                 if (Randomly.getBoolean()) {
                     generateConstant = YSQLExpressionGenerator.generateConstant(globalState.getRandomly(),

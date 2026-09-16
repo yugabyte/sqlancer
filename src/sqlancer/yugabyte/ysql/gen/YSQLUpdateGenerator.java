@@ -68,6 +68,10 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
 
     @Override
     protected void updateValue(YSQLColumn column) {
+        if (column.isGenerated()) {
+            sb.append("DEFAULT");
+            return;
+        }
         YSQLDataType type = column.getType();
         if (Randomly.getBooleanWithRatherLowProbability()) {
             String name = column.getName();

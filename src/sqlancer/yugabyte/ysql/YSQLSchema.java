@@ -243,13 +243,14 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
         List<YSQLColumn> columns = new ArrayList<>();
         try (Statement s = con.createStatement()) {
             try (ResultSet rs = s.executeQuery(
-                    "select column_name, data_type, udt_name from INFORMATION_SCHEMA.COLUMNS where table_name = '"
+                    "select column_name, data_type, udt_name, generation_expression from INFORMATION_SCHEMA.COLUMNS where table_name = '"
                             + tableName + "' ORDER BY column_name")) {
                 while (rs.next()) {
                     String columnName = rs.getString("column_name");
                     String dataType = rs.getString("data_type");
                     String udtName = rs.getString("udt_name");
-                    YSQLColumn c = new YSQLColumn(columnName, getColumnType(dataType, udtName));
+                    YSQLColumn c = new YSQLColumn(columnName, getColumnType(dataType, udtName),
+                            rs.getString("generation_expression"));
                     columns.add(c);
                 }
             }
@@ -388,8 +389,23 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
 
     public static class YSQLColumn extends AbstractTableColumn<YSQLTable, YSQLDataType> {
 
+        private final String generationExpression;
+
         public YSQLColumn(String name, YSQLDataType columnType) {
+            this(name, columnType, null);
+        }
+
+        public YSQLColumn(String name, YSQLDataType columnType, String generationExpression) {
             super(name, null, columnType);
+            this.generationExpression = generationExpression;
+        }
+
+        public boolean isGenerated() {
+            return generationExpression != null && !generationExpression.isEmpty();
+        }
+
+        public String getGenerationExpression() {
+            return generationExpression;
         }
 
         public static YSQLColumn createDummy(String name) {

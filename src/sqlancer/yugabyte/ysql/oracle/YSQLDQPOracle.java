@@ -15,12 +15,14 @@ import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
+import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLMergeScanQueryGenerator;
 
 /**
  * Differential Query Plan (DQP) oracle: runs one generated query under a series of plan-forcing configurations - each
@@ -89,6 +91,11 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
             select.setWhereClause(gen.generateExpression(0, YSQLDataType.BOOLEAN));
         }
         String queryString = YSQLVisitor.asString(select);
+        List<YSQLTable> bucketTables = state.getSchema().getDatabaseTables().stream()
+                .filter(YSQLMergeScanQueryGenerator::isCandidate).collect(Collectors.toList());
+        if (!state.isPgCompatible() && !bucketTables.isEmpty() && Randomly.getBoolean()) {
+            queryString = YSQLMergeScanQueryGenerator.generate(Randomly.fromList(bucketTables));
+        }
 
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
