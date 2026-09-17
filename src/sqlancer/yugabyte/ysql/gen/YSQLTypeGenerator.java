@@ -9,6 +9,7 @@ import sqlancer.yugabyte.ysql.YSQLGlobalState;
 public final class YSQLTypeGenerator {
 
     private static final int MAX_TYPES = 5;
+    private static final int MAX_COMPOSITE_FIELDS = 4;
 
     private YSQLTypeGenerator() {
     }
@@ -23,13 +24,19 @@ public final class YSQLTypeGenerator {
         errors.add("type");
         errors.add("cannot drop");
         errors.add("cannot be made a member of itself");
+        errors.add("ALTER TYPE DROP ATTRIBUTE not supported yet");
+        errors.add("drop attribute on typed table is not supported yet");
+        errors.add("cannot drop attribute");
+        errors.add("is an enum type");
 
-        switch (Randomly.fromOptions(0, 1, 2)) {
+        switch (Randomly.fromOptions(0, 1, 2, 3)) {
         case 0:
             return generateCreateEnum(globalState, errors);
         case 1:
             return generateCreateComposite(globalState, errors);
         case 2:
+            return generateDropAttribute(globalState, errors);
+        case 3:
             return generateDrop(errors);
         default:
             throw new AssertionError();
@@ -55,7 +62,7 @@ public final class YSQLTypeGenerator {
         StringBuilder sb = new StringBuilder();
         String typeName = "tp" + globalState.getRandomly().getInteger(0, MAX_TYPES);
         sb.append("CREATE TYPE ").append(typeName).append(" AS (");
-        int numFields = 1 + Randomly.smallNumber() % 4;
+        int numFields = 1 + Randomly.smallNumber() % MAX_COMPOSITE_FIELDS;
         for (int i = 0; i < numFields; i++) {
             if (i > 0) {
                 sb.append(", ");
@@ -64,6 +71,20 @@ public final class YSQLTypeGenerator {
             sb.append(Randomly.fromOptions("INTEGER", "TEXT", "BOOLEAN", "NUMERIC", "BIGINT"));
         }
         sb.append(")");
+        return new SQLQueryAdapter(sb.toString(), errors, true);
+    }
+
+    private static SQLQueryAdapter generateDropAttribute(YSQLGlobalState globalState, ExpectedErrors errors) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("ALTER TYPE tp").append(globalState.getRandomly().getInteger(0, MAX_TYPES));
+        sb.append(" DROP ATTRIBUTE ");
+        if (Randomly.getBoolean()) {
+            sb.append("IF EXISTS ");
+        }
+        sb.append("f").append(Randomly.smallNumber() % MAX_COMPOSITE_FIELDS);
+        if (Randomly.getBoolean()) {
+            sb.append(" ").append(Randomly.fromOptions("RESTRICT", "CASCADE"));
+        }
         return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 

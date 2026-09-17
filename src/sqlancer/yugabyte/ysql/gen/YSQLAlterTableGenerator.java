@@ -61,6 +61,7 @@ public class YSQLAlterTableGenerator {
         errors.add("could not find cast from");
         errors.add("does not exist"); // TODO: investigate
         errors.add("constraints on permanent tables may reference only permanent tables");
+        errors.add("is a generated column");
         List<Action> action;
         if (Randomly.getBoolean()) {
             action = Randomly.nonEmptySubset(Action.values());
@@ -93,7 +94,6 @@ public class YSQLAlterTableGenerator {
         action.remove(Action.ENABLE_RULE);
         action.remove(Action.ENABLE_REPLICA_RULE);
         action.remove(Action.ENABLE_ALWAYS_RULE);
-        action.remove(Action.ALTER_COLUMN_SET_STORAGE);
         action.remove(Action.SET_WITHOUT_CLUSTER);
         action.remove(Action.ATTACH_PARTITION);
         action.remove(Action.DETACH_PARTITION);
@@ -304,6 +304,7 @@ public class YSQLAlterTableGenerator {
                 errors.add("constraints on temporary tables may reference only temporary tables");
                 errors.add("constraints on unlogged tables may reference only permanent or unlogged tables");
                 errors.add("constraints on permanent tables may reference only permanent tables");
+                errors.add("is a generated column");
                 errors.add("cannot reference partitioned table");
                 errors.add("cannot be implemented");
                 errors.add("violates foreign key constraint");

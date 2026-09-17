@@ -30,12 +30,14 @@ public final class YSQLFunctionGenerator {
         errors.add("CALLED ON NULL INPUT");
         errors.add("set-returning functions");
 
-        switch (Randomly.fromOptions(0, 1, 2)) {
+        switch (Randomly.fromOptions(0, 1, 2, 3)) {
         case 0:
             return generateCreateFunction(globalState, errors);
         case 1:
             return generateCreateTriggerFunction(globalState, errors);
         case 2:
+            return generateTransitionTableFunction(globalState, errors);
+        case 3:
             return generateDrop(errors);
         default:
             throw new AssertionError();
@@ -78,6 +80,30 @@ public final class YSQLFunctionGenerator {
             sb.append(" ").append(Randomly.fromOptions("IMMUTABLE", "STABLE", "VOLATILE"));
         }
         return new SQLQueryAdapter(sb.toString(), errors, true);
+    }
+
+    public static SQLQueryAdapter generateTransitionTableFunction(YSQLGlobalState globalState, ExpectedErrors errors) {
+        if (globalState.getSchema().getDatabaseTables().isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        String funcName = Randomly.fromOptions(YSQLTriggerGenerator.TRANSITION_FUNCTIONS);
+        return new SQLQueryAdapter(transitionFunctionSql(funcName), errors, true);
+    }
+
+    // The body reads the transition tables by the aliases the trigger declares, so the function is only
+    // executable from a trigger that names them.
+    public static String transitionFunctionSql(String funcName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("CREATE OR REPLACE FUNCTION ").append(funcName).append("() RETURNS TRIGGER AS $$ DECLARE n bigint; ");
+        sb.append("BEGIN ");
+        if (!funcName.equals(YSQLTriggerGenerator.TRANSITION_FUNCTION_OLD)) {
+            sb.append("SELECT count(*) INTO n FROM ").append(YSQLTriggerGenerator.NEW_TABLE_ALIAS).append("; ");
+        }
+        if (!funcName.equals(YSQLTriggerGenerator.TRANSITION_FUNCTION_NEW)) {
+            sb.append("SELECT count(*) INTO n FROM ").append(YSQLTriggerGenerator.OLD_TABLE_ALIAS).append("; ");
+        }
+        sb.append("RETURN NULL; END; $$ LANGUAGE plpgsql");
+        return sb.toString();
     }
 
     private static SQLQueryAdapter generateCreateTriggerFunction(YSQLGlobalState globalState, ExpectedErrors errors) {
