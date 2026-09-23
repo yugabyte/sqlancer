@@ -49,7 +49,8 @@ public final class YSQLStatisticsGenerator {
                 // default btree operator class - a legitimate rejection, not a bug.
                 "cannot be used in statistics", "has no default btree operator class",
                 // A prior tolerated error may leave the surrounding transaction block aborted.
-                "current transaction is aborted, commands ignored until end of transaction block"), true);
+                "current transaction is aborted, commands ignored until end of transaction block",
+                "could not serialize access due to concurrent update"), true);
     }
 
     public static SQLQueryAdapter remove(YSQLGlobalState globalState) {
