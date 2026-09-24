@@ -8,6 +8,7 @@ import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.schema.AbstractTableColumn;
+import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLStatisticsObject;
@@ -44,13 +45,15 @@ public final class YSQLStatisticsGenerator {
         sb.append(randomColumns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
         sb.append(" FROM ");
         sb.append(randomTable.getName());
-        return new SQLQueryAdapter(sb.toString(), ExpectedErrors.from("cannot have more than 8 columns in statistics",
+        ExpectedErrors errors = ExpectedErrors.from("cannot have more than 8 columns in statistics",
                 // Extended statistics require btree-orderable columns; geometric/other types have no
                 // default btree operator class - a legitimate rejection, not a bug.
                 "cannot be used in statistics", "has no default btree operator class",
                 // A prior tolerated error may leave the surrounding transaction block aborted.
                 "current transaction is aborted, commands ignored until end of transaction block",
-                "could not serialize access due to concurrent update"), true);
+                "could not serialize access due to concurrent update");
+        YSQLErrors.addTransactionErrors(errors);
+        return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 
     public static SQLQueryAdapter remove(YSQLGlobalState globalState) {
@@ -61,8 +64,10 @@ public final class YSQLStatisticsGenerator {
             throw new IgnoreMeException();
         }
         sb.append(Randomly.fromList(statistics).getName());
-        return new SQLQueryAdapter(sb.toString(), ExpectedErrors.from("does not exist",
-                "current transaction is aborted, commands ignored until end of transaction block"), true);
+        ExpectedErrors errors = ExpectedErrors.from("does not exist",
+                "current transaction is aborted, commands ignored until end of transaction block");
+        YSQLErrors.addTransactionErrors(errors);
+        return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 
     private static String getNewStatisticsName(YSQLTable randomTable) {

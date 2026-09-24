@@ -467,7 +467,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         return msg.contains("Catalog Version Mismatch") || msg.contains("Restart read required")
                 || msg.contains("could not serialize access due to concurrent update") || msg.contains("not onlined")
                 || msg.contains("is being accessed by other users") || msg.contains("connection has been closed")
-                || msg.contains("does not exist") || msg.contains("already exists") || msg.contains("Timed out waiting")
+                || msg.contains("An I/O error occurred while sending to the backend") || msg.contains("does not exist")
+                || msg.contains("already exists") || msg.contains("Timed out waiting")
                 || msg.contains("Restarting a DDL transaction not supported")
                 || msg.contains("insufficient disk space");
     }

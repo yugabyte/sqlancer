@@ -535,6 +535,8 @@ public class YSQLAlterTableGenerator {
                 errors.add("already inherits from table");
                 errors.add("cannot change inheritance of partitioned table");
                 errors.add("cannot inherit to temporary relation");
+                // PG rejects INHERIT when the child has transition-table triggers.
+                errors.add("from becoming an inheritance child");
                 break;
 
             case NO_INHERIT:

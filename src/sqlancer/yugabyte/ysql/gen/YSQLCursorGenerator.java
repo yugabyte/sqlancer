@@ -22,6 +22,7 @@ public final class YSQLCursorGenerator {
         ExpectedErrors errors = new ExpectedErrors();
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addCommonExpressionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors);
         errors.add("does not exist");
         errors.add("already in use");
         errors.add("already exists");

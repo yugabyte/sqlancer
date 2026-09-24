@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.common.gen.ExpressionGenerator;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLCompoundDataType;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLProvider;
@@ -1242,7 +1243,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         case CASE_EXPRESSION:
             return generateCaseExpression(depth + 1, YSQLDataType.INT);
         case YB_HASH_CODE:
-            return new YSQLFunction("yb_hash_code", YSQLDataType.INT, generateExpression(depth + 1));
+            // A leaf argument (constant or column) cannot build a multi-MB string such as rpad(x, 6830*8044, y).
+            return new YSQLFunction("yb_hash_code", YSQLDataType.INT,
+                    generateExpression(YugabyteBugs.bugYbHashCodeUnboundedAlloca ? maxDepth + 1 : depth + 1));
         case SCALAR_SUBQUERY:
             return new YSQLScalarSubquery(createSubquerySelect(1, YSQLDataType.INT), YSQLDataType.INT);
         case POSITION_GRAMMAR:

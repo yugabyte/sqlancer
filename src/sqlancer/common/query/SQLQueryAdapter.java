@@ -158,7 +158,8 @@ public class SQLQueryAdapter extends Query<SQLConnection> implements Serializabl
         Throwable ex = e;
 
         while (ex != null) {
-            if (expectedErrors.errorIsExpected(ex.getMessage())) {
+            // Causes such as EOFException carry no message; skip them instead of failing on the null.
+            if (ex.getMessage() != null && expectedErrors.errorIsExpected(ex.getMessage())) {
                 return;
             } else {
                 ex = ex.getCause();

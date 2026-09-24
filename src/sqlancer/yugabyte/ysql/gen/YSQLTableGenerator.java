@@ -104,9 +104,12 @@ public class YSQLTableGenerator {
 
     public static SQLQueryAdapter generateHashBucketTable(String tableName) {
         int buckets = Randomly.fromOptions(2, 3, 4, 8);
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addCommonTableErrors(errors);
+        YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter("CREATE TABLE " + tableName
                 + " (c0 int, c1 int, c2 int, c3 int, c4 int GENERATED ALWAYS AS (yb_hash_code(c0) % " + buckets
-                + ") STORED, PRIMARY KEY (c4 ASC, c1 ASC, c2 ASC))", true);
+                + ") STORED, PRIMARY KEY (c4 ASC, c1 ASC, c2 ASC))", errors, true);
     }
 
     private void createStandard() throws AssertionError {

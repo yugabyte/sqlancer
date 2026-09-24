@@ -21,7 +21,13 @@ public final class YSQLErrors {
         errors.add("marked for deletion");
         errors.add("hit the limit");
         errors.add("insufficient disk space");
+        // Cluster-wide tablet replica cap; any DDL that creates tablets (CREATE TABLE/INDEX/MV, TRUNCATE, REFRESH)
+        // can hit it once a long run has accumulated tables.
+        errors.add("exceed the safe system maximum");
         errors.add("NullTest indexqual has wrong key");
+        if (YugabyteBugs.bugYbHashCodeSaopIndexQual) {
+            errors.add("indexqual doesn't have key on left side");
+        }
         if (YugabyteBugs.bugPlannerVariableNotFoundInSubplan) {
             errors.add("variable not found in subplan target list");
         }
@@ -156,6 +162,9 @@ public final class YSQLErrors {
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
         errors.add("invalid line specification");
+        // EXTRACT(field FROM x) rejects fields that the source type lacks, e.g. HOUR FROM date or DOY FROM interval.
+        errors.addRegexString("unit \"[^\"]+\" not supported for type");
+        errors.add("DECIMAL does not support Infinity yet");
         // covers "CASE/WHEN could not convert type", "GREATEST/LEAST could not convert type", etc.
         errors.add("could not convert type");
         errors.add("Unterminated string literal started at position");

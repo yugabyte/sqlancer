@@ -27,6 +27,9 @@ public final class YSQLMaterializedViewRefresh {
             errors.add("Create a unique index with no WHERE clause on one or more columns of the materialized view");
             errors.add("cannot refresh materialized view");
             errors.add("duplicate key value violates unique constraint");
+            // CONCURRENTLY requires the new contents to have no fully non-null duplicate rows.
+            errors.add("contains duplicate rows without any null columns");
+            errors.add("contains rows with all null values");
             return new SQLQueryAdapter(sb.toString(), errors, true);
         } catch (Exception e) {
             throw new IgnoreMeException();

@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql.ast;
 
+import sqlancer.IgnoreMeException;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 
 public class YSQLFunction implements YSQLExpression {
@@ -395,16 +396,19 @@ public class YSQLFunction implements YSQLExpression {
                     return YSQLConstant.createNullConstant();
                 }
                 String str = evaluatedArgs[0].asString();
-                int start = (int) evaluatedArgs[1].asInt() - 1; // PostgreSQL uses 1-based indexing
-                int length = (int) evaluatedArgs[2].asInt();
-                if (start < 0) {
-                    start = 0;
+                // INT arguments may be numeric text literals, so cast before reading them.
+                long from = evaluatedArgs[1].cast(YSQLDataType.INT).asInt() - 1; // PostgreSQL uses 1-based indexing
+                long length = evaluatedArgs[2].cast(YSQLDataType.INT).asInt();
+                if (length < 0) {
+                    throw new IgnoreMeException(); // "negative substring length not allowed"
                 }
-                if (start >= str.length()) {
+                // The window [from, from + length) is clipped to the string, so a start before 1 shortens it.
+                long start = Math.max(from, 0);
+                long end = Math.min(from + length, str.length());
+                if (start >= end) {
                     return YSQLConstant.createTextConstant("");
                 }
-                int end = Math.min(start + length, str.length());
-                return YSQLConstant.createTextConstant(str.substring(start, end));
+                return YSQLConstant.createTextConstant(str.substring((int) start, (int) end));
             }
 
             @Override
