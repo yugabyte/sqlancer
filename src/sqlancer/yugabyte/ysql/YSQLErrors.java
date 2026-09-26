@@ -171,6 +171,8 @@ public final class YSQLErrors {
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
+        // Any expression may embed a TLP subquery (createSubquery), which may carry a row-locking clause.
+        addRowLockingErrors(errors);
         errors.add("invalid line specification");
         // EXTRACT(field FROM x) rejects fields that the source type lacks, e.g. HOUR FROM date or DOY FROM interval.
         errors.addRegexString("unit \"[^\"]+\" not supported for type");

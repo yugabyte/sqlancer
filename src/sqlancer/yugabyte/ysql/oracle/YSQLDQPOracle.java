@@ -97,6 +97,7 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
             queryString = YSQLMergeScanQueryGenerator.generate(Randomly.fromList(bucketTables));
         }
 
+        YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
         for (String[] config : PLAN_CONFIGS) {

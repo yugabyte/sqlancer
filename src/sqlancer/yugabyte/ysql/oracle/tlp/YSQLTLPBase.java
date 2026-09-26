@@ -94,9 +94,9 @@ public class YSQLTLPBase extends TernaryLogicPartitioningOracleBase<YSQLExpressi
         select.setFromList(tableList);
         select.setWhereClause(null);
         select.setJoinClauses(joins);
-        if (Randomly.getBoolean()) {
-            select.setRandomRowLocking();
-        }
+        // No row-locking clause on the partitioned query itself: TLP combines its partitions with UNION [ALL] and
+        // the HAVING/aggregate/GROUP BY/DISTINCT variants add clauses that reject FOR UPDATE, so every such check would
+        // fail before comparing. Row locking is exercised through createSubquery and the SKIP_LOCKED oracle instead.
     }
 
     List<YSQLExpression> generateFetchColumns() {

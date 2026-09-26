@@ -159,6 +159,7 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         }
 
         capturePlan(queryString, "default");
+        YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
         String[] flip = Randomly.fromOptions(GUC_FLIPS);
