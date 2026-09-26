@@ -46,6 +46,14 @@ public final class YugabyteBugs {
     // holds, YSQLSkipLockedOracle checks NOWAIT only when both sessions are READ COMMITTED.
     public static boolean bugNowaitAbortsRepeatableReadHolder = true;
 
+    // YSQL: "UPDATE t SET pk = pk" (a primary-key column set to its own value) takes no row lock. Another session's
+    // FOR SHARE SKIP LOCKED returns the row, FOR SHARE NOWAIT does not fail, and a concurrent UPDATE of the row does
+    // not
+    // wait. A same-value update of a non-key column locks correctly; yb_skip_redundant_update_ops and
+    // yb_update_optimization_infra do not change it. While this holds, YSQLSkipLockedOracle does not lock rows through
+    // same-value updates of primary-key columns.
+    public static boolean bugSameValuePrimaryKeyUpdateTakesNoLock = true;
+
     private YugabyteBugs() {
     }
 
