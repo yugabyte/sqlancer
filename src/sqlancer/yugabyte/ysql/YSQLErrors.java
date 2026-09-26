@@ -40,6 +40,7 @@ public final class YSQLErrors {
 
     public static void addCommonFetchErrors(ExpectedErrors errors) {
         addKnownIssues(errors);
+        addRowLockingErrors(errors);
 
         errors.add("must be called before any query");
         errors.add("cannot be applied when");
@@ -158,6 +159,15 @@ public final class YSQLErrors {
         // Timeout errors
         errors.add("canceling statement due to statement timeout");
         errors.add("canceling statement due to lock timeout");
+    }
+
+    // Legitimate rejections of a SELECT ... FOR UPDATE/NO KEY UPDATE/SHARE/KEY SHARE [OF t] [NOWAIT | SKIP LOCKED]
+    // clause: DISTINCT, GROUP BY, HAVING, aggregates, window functions, set operations, SRFs in the target list, the
+    // nullable side of an outer join, materialized views, and an OF table that is not in FROM.
+    public static void addRowLockingErrors(ExpectedErrors errors) {
+        errors.addRegexString("FOR (UPDATE|NO KEY UPDATE|SHARE|KEY SHARE) (is not allowed with|cannot be applied to)");
+        errors.add("cannot lock rows in");
+        errors.add("clause not found in FROM clause");
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
@@ -403,6 +413,7 @@ public final class YSQLErrors {
     }
 
     public static void addViewErrors(ExpectedErrors errors) {
+        addRowLockingErrors(errors); // view bodies come from YSQLRandomQueryGenerator, which may add FOR UPDATE etc.
         errors.add("already exists");
         errors.add("cannot drop columns from view");
         errors.add("non-integer constant in ORDER BY"); // TODO

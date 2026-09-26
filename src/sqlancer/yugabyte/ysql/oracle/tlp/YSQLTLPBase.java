@@ -64,7 +64,7 @@ public class YSQLTLPBase extends TernaryLogicPartitioningOracleBase<YSQLExpressi
             }
         }
         if (Randomly.getBooleanWithRatherLowProbability()) {
-            select.setForClause(YSQLSelect.ForClause.getRandom());
+            select.setRandomRowLocking();
         }
         return new YSQLSelect.YSQLSubquery(select, name);
     }
@@ -95,7 +95,7 @@ public class YSQLTLPBase extends TernaryLogicPartitioningOracleBase<YSQLExpressi
         select.setWhereClause(null);
         select.setJoinClauses(joins);
         if (Randomly.getBoolean()) {
-            select.setForClause(YSQLSelect.ForClause.getRandom());
+            select.setRandomRowLocking();
         }
     }
 

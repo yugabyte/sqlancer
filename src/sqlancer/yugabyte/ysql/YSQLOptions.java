@@ -21,6 +21,7 @@ import sqlancer.yugabyte.ysql.oracle.YSQLFuzzer;
 import sqlancer.yugabyte.ysql.oracle.YSQLNoRECOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLPivotedQuerySynthesisOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLScanGUCOracle;
+import sqlancer.yugabyte.ysql.oracle.YSQLSkipLockedOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPAggregateOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPDistinctOracle;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPGroupByOracle;
@@ -109,6 +110,12 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLScanGUCOracle(globalState);
+            }
+        },
+        SKIP_LOCKED {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLSkipLockedOracle(globalState);
             }
         },
         CERT {

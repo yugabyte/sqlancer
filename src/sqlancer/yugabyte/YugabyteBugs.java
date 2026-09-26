@@ -40,6 +40,12 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/34212
     public static boolean bugYbHashCodeSaopIndexQual = true;
 
+    // YSQL: while a REPEATABLE READ transaction holds a row lock, a READ COMMITTED "SELECT ... FOR <strength> NOWAIT"
+    // on a conflicting strength does not fail with "could not obtain lock on row". It aborts the holder ("expired or
+    // aborted by a conflict") and returns the locked rows. Two READ COMMITTED sessions behave correctly. While this
+    // holds, YSQLSkipLockedOracle checks NOWAIT only when both sessions are READ COMMITTED.
+    public static boolean bugNowaitAbortsRepeatableReadHolder = true;
+
     private YugabyteBugs() {
     }
 

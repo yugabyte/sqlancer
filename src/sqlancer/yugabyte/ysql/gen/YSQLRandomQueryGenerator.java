@@ -14,7 +14,6 @@ import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
-import sqlancer.yugabyte.ysql.ast.YSQLSelect.ForClause;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.SelectType;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect.YSQLFromTable;
 import sqlancer.yugabyte.ysql.ast.YSQLSetOperation;
@@ -94,7 +93,7 @@ public final class YSQLRandomQueryGenerator {
             }
         }
         if (Randomly.getBooleanWithRatherLowProbability()) {
-            select.setForClause(ForClause.getRandom());
+            select.setRandomRowLocking();
         }
 
         // ~15% chance to add CTEs

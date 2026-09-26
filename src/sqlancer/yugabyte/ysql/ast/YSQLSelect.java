@@ -14,6 +14,8 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
     private List<YSQLJoin> joinClauses = Collections.emptyList();
     private YSQLExpression distinctOnClause;
     private ForClause forClause;
+    private LockWaitPolicy lockWaitPolicy = LockWaitPolicy.WAIT;
+    private YSQLTable lockOfTable;
     private List<YSQLCte> cteList = Collections.emptyList();
 
     public List<YSQLCte> getCteList() {
@@ -69,6 +71,36 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
         this.forClause = forClause;
     }
 
+    public LockWaitPolicy getLockWaitPolicy() {
+        return lockWaitPolicy;
+    }
+
+    public void setLockWaitPolicy(LockWaitPolicy lockWaitPolicy) {
+        this.lockWaitPolicy = lockWaitPolicy;
+    }
+
+    public YSQLTable getLockOfTable() {
+        return lockOfTable;
+    }
+
+    public void setLockOfTable(YSQLTable lockOfTable) {
+        this.lockOfTable = lockOfTable;
+    }
+
+    /**
+     * Sets a random row-locking clause: a lock strength, an optional OF on one FROM-list table, and a random wait
+     * policy.
+     */
+    public void setRandomRowLocking() {
+        this.forClause = ForClause.getRandom();
+        this.lockWaitPolicy = LockWaitPolicy.getRandom();
+        List<YSQLExpression> from = getFromList();
+        if (from != null && Randomly.getBoolean()) {
+            from.stream().filter(e -> e instanceof YSQLFromTable).map(e -> ((YSQLFromTable) e).getTable()).findFirst()
+                    .ifPresent(t -> this.lockOfTable = t);
+        }
+    }
+
     public enum ForClause {
         UPDATE("UPDATE"), NO_KEY_UPDATE("NO KEY UPDATE"), SHARE("SHARE"), KEY_SHARE("KEY SHARE");
 
@@ -79,6 +111,24 @@ public class YSQLSelect extends SelectBase<YSQLExpression> implements YSQLExpres
         }
 
         public static ForClause getRandom() {
+            return Randomly.fromOptions(values());
+        }
+
+        public String getTextRepresentation() {
+            return textRepresentation;
+        }
+    }
+
+    public enum LockWaitPolicy {
+        WAIT(""), NOWAIT(" NOWAIT"), SKIP_LOCKED(" SKIP LOCKED");
+
+        private final String textRepresentation;
+
+        LockWaitPolicy(String textRepresentation) {
+            this.textRepresentation = textRepresentation;
+        }
+
+        public static LockWaitPolicy getRandom() {
             return Randomly.fromOptions(values());
         }
 

@@ -193,6 +193,15 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             sb.append(" OFFSET ");
             visit(s.getOffsetClause());
         }
+        if (s.getForClause() != null) {
+            sb.append(" FOR ");
+            sb.append(s.getForClause().getTextRepresentation());
+            if (s.getLockOfTable() != null) {
+                sb.append(" OF ");
+                sb.append(s.getLockOfTable().getName());
+            }
+            sb.append(s.getLockWaitPolicy().getTextRepresentation());
+        }
     }
 
     @Override
