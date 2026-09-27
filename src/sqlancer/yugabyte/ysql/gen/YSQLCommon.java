@@ -329,6 +329,9 @@ public final class YSQLCommon {
             sb.append("CHECK(");
             sb.append(YSQLVisitor.getExpressionAsString(globalState, YSQLDataType.BOOLEAN, table.getColumns()));
             sb.append(")");
+            if (globalState.isPgCompatible() && Randomly.getBooleanWithRatherLowProbability()) {
+                sb.append(" NOT ENFORCED"); // PostgreSQL 18
+            }
             errors.add("constraint must be added to child tables too");
             errors.add("missing FROM-clause entry for table");
             break;
@@ -383,6 +386,11 @@ public final class YSQLCommon {
                 } else {
                     sb.append("NOT DEFERRABLE");
                 }
+            }
+            if (globalState.isPgCompatible() && Randomly.getBooleanWithRatherLowProbability()) {
+                sb.append(" NOT ENFORCED"); // PostgreSQL 18: the reference is not checked
+                errors.add("cannot be marked NOT ENFORCED");
+                errors.add("conflicting constraint properties");
             }
             break;
         default:

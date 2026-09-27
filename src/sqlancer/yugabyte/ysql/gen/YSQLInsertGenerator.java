@@ -146,6 +146,10 @@ public final class YSQLInsertGenerator {
                 sb.append(
                         returningColumns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
             }
+            if (globalState.isPgCompatible() && Randomly.getBoolean()) {
+                // PostgreSQL 18 old/new row aliases; old is NULL unless ON CONFLICT DO UPDATE fires.
+                sb.append(Randomly.fromOptions(", old.*", ", new.*", ", old.*, new.*"));
+            }
         }
         return new SQLQueryAdapter(sb.toString(), errors);
     }

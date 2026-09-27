@@ -30,6 +30,7 @@ public final class YSQLMaterializedViewRefresh {
             // CONCURRENTLY requires the new contents to have no fully non-null duplicate rows.
             errors.add("contains duplicate rows without any null columns");
             errors.add("contains rows with all null values");
+            errors.add("could not create unique index"); // PostgreSQL wording for a unique index over duplicates
             return new SQLQueryAdapter(sb.toString(), errors, true);
         } catch (Exception e) {
             throw new IgnoreMeException();

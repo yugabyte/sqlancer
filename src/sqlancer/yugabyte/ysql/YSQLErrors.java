@@ -115,6 +115,9 @@ public final class YSQLErrors {
         errors.add("cannot be changed");
         errors.add("cannot split table that does not have primary key");
         errors.add("exceed the safe system maximum");
+        errors.add("partitioned tables cannot be unlogged"); // PostgreSQL 18; YugabyteDB ignores UNLOGGED
+        // PostgreSQL 18 temporal keys: non-range column types, missing PERIOD in a referencing foreign key.
+        errors.add("WITHOUT OVERLAPS");
         errors.add("cannot use subquery in check constraint");
         errors.add("cannot use subquery in DEFAULT expression");
         errors.add("cannot use subquery in partition key expression");
@@ -177,6 +180,10 @@ public final class YSQLErrors {
         // EXTRACT(field FROM x) rejects fields that the source type lacks, e.g. HOUR FROM date or DOY FROM interval.
         errors.addRegexString("unit \"[^\"]+\" not supported for type");
         errors.add("DECIMAL does not support Infinity yet");
+        // PostgreSQL 17+ SQL/JSON functions (json_exists, json_value, json_query) reject malformed jsonpath strings.
+        errors.add("of jsonpath input");
+        // A JSON_TABLE scalar subquery may reference an ungrouped outer column inside GROUP BY/HAVING queries.
+        errors.add("subquery uses ungrouped column");
         // covers "CASE/WHEN could not convert type", "GREATEST/LEAST could not convert type", etc.
         errors.add("could not convert type");
         errors.add("Unterminated string literal started at position");
@@ -357,6 +364,7 @@ public final class YSQLErrors {
     }
 
     public static void addCommonInsertUpdateErrors(ExpectedErrors errors) {
+        errors.add("empty WITHOUT OVERLAPS value found"); // PostgreSQL 18 temporal keys reject empty ranges
         errors.add("value too long for type character");
         errors.add("not found in view targetlist");
         errors.add("cannot perform INSERT RETURNING");

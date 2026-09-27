@@ -1,7 +1,9 @@
 package sqlancer.yugabyte.ysql.ast;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
@@ -183,10 +185,20 @@ public enum YSQLFunctionWithUnknownResult {
     // PG_DATABASE_SIZE("pg_database_size", YSQLDataType.INT, YSQLDataType.INT);
     // PG_SIZE_BYTES("pg_size_bytes", YSQLDataType.INT, YSQLDataType.TEXT);
 
-    // SQL/JSON path functions (PostgreSQL 15+)
+    // SQL/JSON path functions (PostgreSQL 17+; not in YugabyteDB's PostgreSQL 15)
     JSON_EXISTS("json_exists", YSQLDataType.BOOLEAN, YSQLDataType.JSONB, YSQLDataType.TEXT),
     JSON_VALUE("json_value", YSQLDataType.TEXT, YSQLDataType.JSONB, YSQLDataType.TEXT),
-    JSON_QUERY("json_query", YSQLDataType.JSONB, YSQLDataType.JSONB, YSQLDataType.TEXT);
+    JSON_QUERY("json_query", YSQLDataType.JSONB, YSQLDataType.JSONB, YSQLDataType.TEXT),
+
+    // PostgreSQL 18
+    CASEFOLD("casefold", YSQLDataType.TEXT, YSQLDataType.TEXT),
+    ARRAY_SORT("array_sort", YSQLDataType.INT_ARRAY, YSQLDataType.INT_ARRAY),
+    ARRAY_REVERSE("array_reverse", YSQLDataType.INT_ARRAY, YSQLDataType.INT_ARRAY),
+    CRC32("crc32", YSQLDataType.BIGINT, YSQLDataType.BYTEA), CRC32C("crc32c", YSQLDataType.BIGINT, YSQLDataType.BYTEA);
+
+    // Functions that exist only in newer PostgreSQL; generated only in PostgreSQL-compatible mode (AMP).
+    private static final Set<YSQLFunctionWithUnknownResult> PG_ONLY = EnumSet.of(JSON_EXISTS, JSON_VALUE, JSON_QUERY,
+            CASEFOLD, ARRAY_SORT, ARRAY_REVERSE, CRC32, CRC32C);
 
     private final String functionName;
     private final YSQLDataType returnType;
@@ -198,10 +210,10 @@ public enum YSQLFunctionWithUnknownResult {
         this.argTypes = indexType.clone();
     }
 
-    public static List<YSQLFunctionWithUnknownResult> getSupportedFunctions(YSQLDataType type) {
+    public static List<YSQLFunctionWithUnknownResult> getSupportedFunctions(YSQLDataType type, boolean pgCompatible) {
         List<YSQLFunctionWithUnknownResult> functions = new ArrayList<>();
         for (YSQLFunctionWithUnknownResult func : values()) {
-            if (func.isCompatibleWithReturnType(type)) {
+            if (func.isCompatibleWithReturnType(type) && (pgCompatible || !PG_ONLY.contains(func))) {
                 functions.add(func);
             }
         }

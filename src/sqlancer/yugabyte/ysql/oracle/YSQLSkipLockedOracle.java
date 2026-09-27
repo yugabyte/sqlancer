@@ -33,10 +33,10 @@ import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
  *
  * <p>
  * Session A opens a transaction and locks rows of {@code t}, by one of: {@code SELECT ... FOR <strength>} on an
- * explicit subset of real rows, the same on a random predicate, {@code UPDATE ... SET c = c} (FOR UPDATE strength when
- * c is a key column, FOR NO KEY UPDATE otherwise) or {@code DELETE}. The rows A really locked come back through the
- * statement itself (the SELECT result or RETURNING). While A holds them, session B reads the rows that satisfy Q
- * ("all", ordered), then reads them again {@code FOR <strength> [OF t] SKIP LOCKED | NOWAIT}, optionally as a queue
+ * explicit subset of real rows, the same on a random predicate, {@code UPDATE ... SET c = c} (FOR NO KEY UPDATE
+ * strength, because no key value changes) or {@code DELETE}. The rows A really locked come back through the statement
+ * itself (the SELECT result or RETURNING). While A holds them, session B reads the rows that satisfy Q ("all",
+ * ordered), then reads them again {@code FOR <strength> [OF t] SKIP LOCKED | NOWAIT}, optionally as a queue
  * ({@code ORDER BY ... LIMIT n}), through a join, under forced index or sequential scans, and under YugabyteDB's
  * explicit-row-locking batching knobs.
  * <ul>
@@ -48,8 +48,9 @@ import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
  * <li>Session C then runs {@code FOR UPDATE SKIP LOCKED} on the union of A's and B's rows. Both still hold locks that
  * conflict with FOR UPDATE, so C must get no rows.</li>
  * </ul>
- * Rows are identified by {@code tableoid} and {@code ybctid}. SERIALIZABLE is excluded, and NOWAIT is checked only for
- * READ COMMITTED requesters, because YugabyteDB supports neither policy otherwise.
+ * Rows are identified by {@code tableoid} and {@code ybctid} ({@code ctid} in PostgreSQL-compatible mode). SERIALIZABLE
+ * is excluded, and NOWAIT is checked only for READ COMMITTED requesters, because YugabyteDB supports neither policy
+ * otherwise.
  */
 public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
 
@@ -58,9 +59,6 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
     private static final int MAX_VERIFIED_ROWS = 256;
     private static final String RC = "READ COMMITTED";
     private static final String RR = "REPEATABLE READ";
-    // Columns of non-partial, non-expression, immediate unique indexes: PostgreSQL's "key" columns for row locks.
-    private static final String KEY_INDEX = "i.indisunique AND i.indimmediate AND i.indpred IS NULL"
-            + " AND i.indexprs IS NULL";
 
     private enum LockSource {
         SELECT_SUBSET, SELECT_PREDICATE, UPDATE_SAME_VALUE, DELETE
@@ -141,9 +139,11 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
     @Override
     public void check() throws SQLException {
         List<YSQLTable> candidates = candidateTables();
+        boolean pgCompatible = state.isPgCompatible();
         String isolationA = Randomly.fromOptions(RC, RR);
         String isolationB = Randomly.fromOptions(RC, RR);
-        boolean nowaitSupported = RC.equals(isolationB)
+        // PostgreSQL supports NOWAIT at every isolation level; YugabyteDB documents it for READ COMMITTED requesters.
+        boolean nowaitSupported = pgCompatible || RC.equals(isolationB)
                 && (!YugabyteBugs.bugNowaitAbortsRepeatableReadHolder || RC.equals(isolationA));
         boolean nowait = nowaitSupported && Randomly.getBoolean();
         ForClause strengthB = ForClause.getRandom();
@@ -158,7 +158,8 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
             YSQLTable table = null;
             List<String> allRows = Collections.emptyList();
             for (YSQLTable candidate : candidates) {
-                allRows = queryRaw(a, "SELECT " + rowId(candidate.getName()) + " FROM " + candidate.getName());
+                allRows = queryRaw(a,
+                        "SELECT " + rowId(candidate.getName(), pgCompatible) + " FROM " + candidate.getName());
                 if (!allRows.isEmpty()) {
                     table = candidate;
                     break;
@@ -168,7 +169,7 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
                 throw new IgnoreMeException();
             }
             String t = table.getName();
-            String id = rowId(t);
+            String id = rowId(t, pgCompatible);
             log.add("-- A: SELECT " + id + " FROM " + t + ";");
             YSQLExpressionGenerator gen = new YSQLExpressionGenerator(state).setColumns(table.getColumns());
             String readPredicate = Randomly.getBoolean() ? "TRUE"
@@ -195,13 +196,14 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
                         + strengthA.getTextRepresentation();
                 break;
             case UPDATE_SAME_VALUE:
-                Set<String> primaryKey = YugabyteBugs.bugSameValuePrimaryKeyUpdateTakesNoLock
+                Set<String> primaryKey = YugabyteBugs.bugSameValuePrimaryKeyUpdateTakesNoLock && !state.isPgCompatible()
                         ? indexColumns(a, t, "i.indisprimary") : Collections.emptySet();
                 YSQLColumn col = Randomly.fromList(
                         table.getColumns().stream().filter(x -> !x.isGenerated() && !primaryKey.contains(x.getName()))
                                 .collect(Collectors.toList()));
-                strengthA = indexColumns(a, t, KEY_INDEX).contains(col.getName()) ? ForClause.UPDATE
-                        : ForClause.NO_KEY_UPDATE;
+                // PostgreSQL picks the row lock by whether key values change; a same-value UPDATE takes NO KEY UPDATE
+                // even on a key column.
+                strengthA = ForClause.NO_KEY_UPDATE;
                 lockStatement = "UPDATE ONLY " + t + " SET " + col.getName() + " = " + col.getName() + " WHERE "
                         + inSubset + " RETURNING " + id;
                 break;
@@ -214,6 +216,14 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
             }
             execute(a, "BEGIN ISOLATION LEVEL " + isolationA, log, "A");
             Set<String> locked = new HashSet<>(query(a, lockStatement, log, "A"));
+            if (pgCompatible && source == LockSource.UPDATE_SAME_VALUE) {
+                // PostgreSQL gives an updated row a new ctid, and other sessions still see the old one. With no
+                // triggers or rules, the UPDATE locked exactly the targeted rows, so use those (by their old ctid).
+                if (locked.size() != subset.size()) {
+                    throw new IgnoreMeException();
+                }
+                locked = new HashSet<>(subset);
+            }
 
             execute(b, "SET statement_timeout = " + STATEMENT_TIMEOUT_MS, log, "B");
             for (String setting : bSettings) {
@@ -288,8 +298,9 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
         return candidates;
     }
 
-    private static String rowId(String t) {
-        return "(" + t + ".tableoid::regclass::text || ':' || " + t + ".ybctid::text)";
+    // Row identity across inheritance children and partitions: ybctid in YugabyteDB, ctid in PostgreSQL.
+    private static String rowId(String t, boolean pgCompatible) {
+        return "(" + t + ".tableoid::regclass::text || ':' || " + t + (pgCompatible ? ".ctid" : ".ybctid") + "::text)";
     }
 
     // UPDATE and DELETE lock exactly their RETURNING rows only when nothing else writes on their behalf: no user
@@ -299,7 +310,7 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
         if (source == LockSource.SELECT_SUBSET || source == LockSource.SELECT_PREDICATE) {
             return source;
         }
-        Set<String> primaryKey = YugabyteBugs.bugSameValuePrimaryKeyUpdateTakesNoLock
+        Set<String> primaryKey = YugabyteBugs.bugSameValuePrimaryKeyUpdateTakesNoLock && !state.isPgCompatible()
                 ? indexColumns(a, table.getName(), "i.indisprimary") : Collections.emptySet();
         boolean writable = source == LockSource.DELETE
                 || table.getColumns().stream().anyMatch(x -> !x.isGenerated() && !primaryKey.contains(x.getName()));

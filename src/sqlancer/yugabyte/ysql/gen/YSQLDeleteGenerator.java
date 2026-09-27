@@ -35,6 +35,9 @@ public final class YSQLDeleteGenerator {
             sb.append(" RETURNING ");
             sb.append(
                     YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, table.getColumns())));
+            if (globalState.isPgCompatible() && Randomly.getBoolean()) {
+                sb.append(", old.*"); // PostgreSQL 18; new.* is all NULL for DELETE
+            }
         }
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonInsertUpdateErrors(errors);

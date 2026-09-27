@@ -18,8 +18,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLIsJson;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJsonTableCount;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
@@ -179,6 +181,18 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
     public void visit(YSQLSubstringGrammar op) {
         print(op);
         visit(op.getString());
+    }
+
+    @Override
+    public void visit(YSQLIsJson op) {
+        print(op);
+        visit(op.getExpr());
+    }
+
+    @Override
+    public void visit(YSQLJsonTableCount op) {
+        print(op);
+        visit(op.getJson());
     }
 
     @Override

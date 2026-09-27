@@ -78,6 +78,9 @@ public class YSQLTableGenerator {
         if (!globalState.isPgCompatible() && !generateOnlyKnown && Randomly.getBooleanWithRatherLowProbability()) {
             return generateHashBucketTable(tableName);
         }
+        if (globalState.isPgCompatible() && !generateOnlyKnown && Randomly.getBooleanWithRatherLowProbability()) {
+            return generateTemporalTable(tableName);
+        }
         columnCanHavePrimaryKey = true;
         sb.append("CREATE");
 
@@ -100,6 +103,18 @@ public class YSQLTableGenerator {
         sb.append(tableName);
         createStandard();
         return new SQLQueryAdapter(sb.toString(), errors, true);
+    }
+
+    // PostgreSQL 18 temporal key: equal c0 ranges must not have overlapping c1 periods. Range-only keys use the
+    // built-in
+    // GiST range opclass, so no btree_gist extension is needed.
+    public static SQLQueryAdapter generateTemporalTable(String tableName) {
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addCommonTableErrors(errors);
+        YSQLErrors.addTransactionErrors(errors);
+        String period = Randomly.fromOptions("int4range", "int8range", "daterange", "tstzrange");
+        return new SQLQueryAdapter("CREATE TABLE " + tableName + " (c0 int4range, c1 " + period + ", c2 int, "
+                + Randomly.fromOptions("PRIMARY KEY", "UNIQUE") + " (c0, c1 WITHOUT OVERLAPS))", errors, true);
     }
 
     public static SQLQueryAdapter generateHashBucketTable(String tableName) {
@@ -244,6 +259,8 @@ public class YSQLTableGenerator {
                         || type == YSQLDataType.TSTZRANGE || type == YSQLDataType.DATERANGE) {
                     sb.append(YSQLVisitor
                             .asString(YSQLExpressionGenerator.generateConstant(globalState.getRandomly(), type)));
+                } else if (type == YSQLDataType.UUID && globalState.isPgCompatible() && Randomly.getBoolean()) {
+                    sb.append(Randomly.fromOptions("uuidv7()", "uuidv4()")); // PostgreSQL 18
                 } else {
                     sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, type)));
                 }
@@ -256,6 +273,10 @@ public class YSQLTableGenerator {
                 sb.append(YSQLVisitor.asString(YSQLExpressionGenerator.generateExpression(globalState, columnsToBeAdded,
                         YSQLDataType.BOOLEAN)));
                 sb.append(")");
+                if (globalState.isPgCompatible() && Randomly.getBooleanWithRatherLowProbability()) {
+                    // PostgreSQL 18: the check is recorded but not enforced, so rows may violate it.
+                    sb.append(" NOT ENFORCED");
+                }
                 errors.add("out of range");
                 break;
             case GENERATED:
@@ -264,7 +285,9 @@ public class YSQLTableGenerator {
                     sb.append(" ALWAYS AS (");
                     sb.append(YSQLVisitor
                             .asString(YSQLExpressionGenerator.generateExpression(globalState, columnsToBeAdded, type)));
-                    sb.append(") STORED");
+                    // PostgreSQL 18 computes VIRTUAL columns on read instead of storing them.
+                    sb.append(globalState.isPgCompatible() && Randomly.getBoolean() ? ") VIRTUAL" : ") STORED");
+                    errors.add("virtual generated column");
                     errors.add("A generated column cannot reference another generated column.");
                     errors.add("cannot use generated column in partition key");
                     errors.add("generation expression is not immutable");

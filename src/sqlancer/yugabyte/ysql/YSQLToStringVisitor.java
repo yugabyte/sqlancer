@@ -25,10 +25,12 @@ import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLIsJson;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin;
 import sqlancer.yugabyte.ysql.ast.YSQLJoin.YSQLJoinType;
+import sqlancer.yugabyte.ysql.ast.YSQLJsonTableCount;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
@@ -361,6 +363,24 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             visit(op.getLen());
         }
         sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLIsJson op) {
+        sb.append("((");
+        visit(op.getExpr());
+        sb.append(") ");
+        sb.append(op.getPredicate());
+        sb.append(")");
+    }
+
+    @Override
+    public void visit(YSQLJsonTableCount op) {
+        sb.append("(SELECT count(*) FROM JSON_TABLE(");
+        visit(op.getJson());
+        sb.append(", '");
+        sb.append(op.getPath());
+        sb.append("' COLUMNS (v text PATH '$')))");
     }
 
     @Override

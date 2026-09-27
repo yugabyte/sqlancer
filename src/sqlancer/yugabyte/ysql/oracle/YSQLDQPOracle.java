@@ -55,6 +55,17 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
             { "yb_fetch_row_limit=1" }, //
     };
 
+    // PostgreSQL-only plan forcers for PostgreSQL-compatible mode (AMP); each check runs every config, so keep it
+    // short.
+    private static final String[][] PG_PLAN_CONFIGS = { //
+            { "enable_hashagg=off" }, //
+            { "enable_sort=off" }, //
+            { "enable_incremental_sort=off" }, //
+            { "enable_memoize=off" }, //
+            { "enable_self_join_elimination=off" }, //
+            { "debug_parallel_query=on" }, //
+    };
+
     private final YSQLGlobalState state;
     private final ExpectedErrors errors = new ExpectedErrors();
     private final ExpectedErrors gucErrors = new ExpectedErrors();
@@ -100,7 +111,7 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
         YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
-        for (String[] config : PLAN_CONFIGS) {
+        for (String[] config : YSQLScanGUCOracle.flipsFor(PLAN_CONFIGS, PG_PLAN_CONFIGS, state.isPgCompatible())) {
             applyGuc(config, true);
             List<String> planResult;
             try {

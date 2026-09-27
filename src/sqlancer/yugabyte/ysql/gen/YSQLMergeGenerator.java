@@ -185,10 +185,22 @@ public final class YSQLMergeGenerator {
             }
         }
 
+        if (globalState.isPgCompatible() && Randomly.getBoolean()) {
+            // PostgreSQL 17 MERGE ... RETURNING with merge_action(); PostgreSQL 18 adds the old/new row aliases.
+            sb.append(" RETURNING merge_action(), ");
+            sb.append(Randomly.fromOptions("*", "old.*", "new.*", "old.*, new.*"));
+        }
+
         // Add common MERGE errors
         errors.add("MERGE is not supported");
         errors.add("This statement not supported yet"); // YugabyteDB specific error
         errors.add("MERGE command cannot affect row a second time");
+        // INSERT and UPDATE actions write generated values, which may violate any table constraint.
+        errors.add("violates not-null constraint");
+        errors.add("violates check constraint");
+        errors.add("violates foreign key constraint");
+        errors.add("violates exclusion constraint");
+        errors.add("duplicate key value violates unique constraint");
         errors.add("MERGE is not supported on tables with rules");
         errors.add("MERGE is not supported on foreign tables");
         errors.add("MERGE is not supported on partitioned tables");

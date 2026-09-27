@@ -22,8 +22,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLGroupingFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLGroupingSets;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLIsJson;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJsonTableCount;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
@@ -139,6 +141,10 @@ public interface YSQLVisitor {
 
     void visit(YSQLPosition op);
 
+    void visit(YSQLIsJson op);
+
+    void visit(YSQLJsonTableCount op);
+
     void visit(YSQLTrimGrammar op);
 
     void visit(YSQLOverlay op);
@@ -216,6 +222,10 @@ public interface YSQLVisitor {
             visit((YSQLSubstringGrammar) expression);
         } else if (expression instanceof YSQLPosition) {
             visit((YSQLPosition) expression);
+        } else if (expression instanceof YSQLIsJson) {
+            visit((YSQLIsJson) expression);
+        } else if (expression instanceof YSQLJsonTableCount) {
+            visit((YSQLJsonTableCount) expression);
         } else if (expression instanceof YSQLTrimGrammar) {
             visit((YSQLTrimGrammar) expression);
         } else if (expression instanceof YSQLOverlay) {

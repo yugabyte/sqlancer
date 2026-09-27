@@ -449,6 +449,8 @@ public class YSQLAlterTableGenerator {
                     sb.append("USING INDEX ").append(randomTable.getRandomIndex().getIndexName());
                     errors.add("cannot use non-unique index");
                     errors.add("index contains expression columns");
+                    // PostgreSQL requires a unique, non-partial, immediate index on NOT NULL columns.
+                    errors.add("cannot be used as replica identity");
                 } else {
                     sb.append(Randomly.fromOptions("DEFAULT", "FULL", "NOTHING"));
                 }

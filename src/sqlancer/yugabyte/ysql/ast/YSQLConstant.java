@@ -275,6 +275,8 @@ public abstract class YSQLConstant implements YSQLExpression {
                 return cast(YSQLDataType.BOOLEAN).isEquals(rightVal.cast(YSQLDataType.BOOLEAN));
             } else if (rightVal.isString()) {
                 return YSQLConstant.createBooleanConstant(value.contentEquals(rightVal.asString()));
+            } else if (rightVal.isDouble()) {
+                throw new IgnoreMeException(); // text vs float: PostgreSQL's implicit cast is not modelled
             } else {
                 throw new AssertionError(rightVal);
             }
@@ -290,6 +292,8 @@ public abstract class YSQLConstant implements YSQLExpression {
                 return cast(YSQLDataType.BOOLEAN).isLessThan(rightVal.cast(YSQLDataType.BOOLEAN));
             } else if (rightVal.isString()) {
                 return YSQLConstant.createBooleanConstant(value.compareTo(rightVal.asString()) < 0);
+            } else if (rightVal.isDouble()) {
+                throw new IgnoreMeException();
             } else {
                 throw new AssertionError(rightVal);
             }

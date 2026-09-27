@@ -41,8 +41,10 @@ import sqlancer.yugabyte.ysql.ast.YSQLFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLFunctionWithUnknownResult;
 import sqlancer.yugabyte.ysql.ast.YSQLInOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLInSubquery;
+import sqlancer.yugabyte.ysql.ast.YSQLIsJson;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBFunction;
 import sqlancer.yugabyte.ysql.ast.YSQLJSONBOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLJsonTableCount;
 import sqlancer.yugabyte.ysql.ast.YSQLLikeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderByTerm;
 import sqlancer.yugabyte.ysql.ast.YSQLOrderedSetAggregate;
@@ -385,7 +387,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private YSQLExpression generateFunctionWithUnknownResult(int depth, YSQLDataType type) {
         List<YSQLFunctionWithUnknownResult> supportedFunctions = YSQLFunctionWithUnknownResult
-                .getSupportedFunctions(type);
+                .getSupportedFunctions(type, globalState != null && globalState.isPgCompatible());
         // filters functions by allowed type (STABLE 's', IMMUTABLE 'i', VOLATILE 'v')
         supportedFunctions = supportedFunctions.stream()
                 .filter(f -> allowedFunctionTypes
@@ -443,6 +445,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         }
         if (columns == null || columns.isEmpty() || globalState == null || globalState.isPgCompatible()) {
             validOptions.remove(BooleanExpression.HASH_CODE_RANGE);
+        }
+        if (globalState == null || !globalState.isPgCompatible() || expectedResult) {
+            validOptions.remove(BooleanExpression.IS_JSON); // PostgreSQL 16+, no Java-side expected value
         }
         if (expectedResult || YSQLProvider.generateOnlyKnown) {
             // PQS requires Java-side expected values.
@@ -534,6 +539,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return generateRowComparison(depth);
         case HASH_CODE_RANGE:
             return generateHashCodeRange();
+        case IS_JSON:
+            return YSQLIsJson.create(generateExpression(depth + 1, YSQLDataType.TEXT));
         default:
             throw new AssertionError();
         }
@@ -1222,6 +1229,11 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         List<IntExpression> validOptions = new ArrayList<>(Arrays.asList(IntExpression.values()));
         if (globalState.isPgCompatible()) {
             validOptions.remove(IntExpression.YB_HASH_CODE);
+        } else {
+            validOptions.remove(IntExpression.JSON_TABLE_COUNT); // PostgreSQL 17+
+        }
+        if (expectedResult) {
+            validOptions.remove(IntExpression.JSON_TABLE_COUNT);
         }
         if (YSQLProvider.generateOnlyKnown || globalState == null || globalState.getSchema() == null) {
             validOptions.remove(IntExpression.SCALAR_SUBQUERY);
@@ -1251,6 +1263,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         case POSITION_GRAMMAR:
             return new YSQLPosition(generateExpression(depth + 1, YSQLDataType.TEXT),
                     generateExpression(depth + 1, YSQLDataType.TEXT));
+        case JSON_TABLE_COUNT:
+            return generateJsonTableCount(depth);
         default:
             throw new AssertionError();
         }
@@ -1442,10 +1456,22 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         }
     }
 
+    // JSON_TABLE is a function in FROM, where PostgreSQL rejects aggregates, so its argument is generated without them.
+    private YSQLExpression generateJsonTableCount(int depth) {
+        boolean aggregates = allowAggregateFunctions;
+        allowAggregateFunctions = false;
+        try {
+            return new YSQLJsonTableCount(generateExpression(depth + 1, YSQLDataType.JSONB),
+                    Randomly.fromOptions("$[*]", "$.*", "$", "$.a[*]", "strict $[*]", "lax $.**"));
+        } finally {
+            allowAggregateFunctions = aggregates;
+        }
+    }
+
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
         SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, TIMESTAMP_EXTRACT, CASE_EXPRESSION,
-        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON, ROW_COMPARISON, HASH_CODE_RANGE, ORM_PREDICATE
+        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON, ROW_COMPARISON, HASH_CODE_RANGE, ORM_PREDICATE, IS_JSON
     }
 
     private enum RangeExpression {
@@ -1462,7 +1488,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
 
     private enum IntExpression {
         UNARY_OPERATION, FUNCTION, CAST, BINARY_ARITHMETIC_EXPRESSION, CASE_EXPRESSION, YB_HASH_CODE, SCALAR_SUBQUERY,
-        POSITION_GRAMMAR
+        POSITION_GRAMMAR, JSON_TABLE_COUNT
     }
 
 }

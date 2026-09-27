@@ -2,6 +2,7 @@ package sqlancer.yugabyte.ysql.oracle;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -111,6 +112,34 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_plpgsql_disable_prefetch_in_for_query=on" }, //
     };
 
+    // PostgreSQL 18 planner switches (plan-only, result-preserving), used in PostgreSQL-compatible mode (AMP)
+    // together with the flips above that set no yb_ parameter.
+    private static final String[][] PG_GUC_FLIPS = { //
+            { "enable_hashagg=off" }, //
+            { "enable_sort=off" }, //
+            { "enable_incremental_sort=off" }, //
+            { "enable_memoize=off" }, //
+            { "enable_gathermerge=off" }, //
+            { "enable_presorted_aggregate=off" }, //
+            { "enable_group_by_reordering=off" }, //
+            { "enable_distinct_reordering=off" }, //
+            { "enable_self_join_elimination=off" }, //
+            { "enable_partition_pruning=off" }, //
+            { "enable_partitionwise_join=on", "enable_partitionwise_aggregate=on" }, //
+            { "enable_tidscan=off" }, //
+            { "enable_async_append=off" }, //
+            { "debug_parallel_query=on" }, //
+            { "max_parallel_workers_per_gather=4", "parallel_setup_cost=0", "parallel_tuple_cost=0",
+                    "min_parallel_table_scan_size=0", "min_parallel_index_scan_size=0" }, //
+            { "max_parallel_workers_per_gather=4", "parallel_setup_cost=0", "parallel_tuple_cost=0",
+                    "enable_parallel_hash=off", "enable_parallel_append=off" }, //
+            { "jit=on", "jit_above_cost=0", "jit_inline_above_cost=0", "jit_optimize_above_cost=0" }, //
+            { "random_page_cost=1000" }, //
+            { "cpu_tuple_cost=100" }, //
+            { "join_collapse_limit=1", "from_collapse_limit=1" }, //
+            { "geqo_threshold=2" }, //
+    };
+
     private final YSQLGlobalState state;
     private final ExpectedErrors errors = new ExpectedErrors();
     private final ExpectedErrors gucErrors = gucExpectedErrors();
@@ -121,6 +150,19 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addSubqueryErrors(errors);
+    }
+
+    // YugabyteDB mode uses all flips; PostgreSQL-compatible mode drops every flip that sets a yb_ parameter (it would
+    // only raise "unrecognized configuration parameter") and adds the PostgreSQL-only ones.
+    static List<String[]> flipsFor(String[][] flips, String[][] pgOnlyFlips, boolean pgCompatible) {
+        if (!pgCompatible) {
+            return Arrays.asList(flips);
+        }
+        List<String[]> result = Arrays.stream(flips)
+                .filter(flip -> Arrays.stream(flip).noneMatch(assignment -> assignment.startsWith("yb_")))
+                .collect(Collectors.toCollection(ArrayList::new));
+        result.addAll(Arrays.asList(pgOnlyFlips));
+        return result;
     }
 
     private static ExpectedErrors gucExpectedErrors() {
@@ -162,7 +204,7 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
         List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
 
-        String[] flip = Randomly.fromOptions(GUC_FLIPS);
+        String[] flip = Randomly.fromList(flipsFor(GUC_FLIPS, PG_GUC_FLIPS, state.isPgCompatible()));
         List<String> flippedResult;
         try {
             applyGuc(flip, true);
