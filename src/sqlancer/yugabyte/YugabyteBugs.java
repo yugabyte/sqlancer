@@ -25,8 +25,8 @@ public final class YugabyteBugs {
     // YSQL: EXTRACT(field FROM ts AT TIME ZONE '<named zone>') raises "time zone \"...\" not recognized" when
     // yb_enable_expression_pushdown=on because the DocDB tserver's postgres backend cannot locate share/timezone
     // (reproduces on production release tarballs; offset zones like '+00' are unaffected). Phorge D51850 /
-    // yugabyte-db#30815; flip to false once shipped to start catching regressions and similar-class bugs.
-    public static boolean bugTimezoneNotRecognizedUnderPushdown = true;
+    // yugabyte-db#30815 (closed); no longer reproduces on master, so the error is reported again.
+    public static boolean bugTimezoneNotRecognizedUnderPushdown;
 
     // YSQL: yb_hash_code() allocates its key buffer with alloca(size) where size is the encoded size of its arguments,
     // so an argument larger than the ~8 MB backend stack (e.g. yb_hash_code(repeat('x', 10000000))) crashes the backend
