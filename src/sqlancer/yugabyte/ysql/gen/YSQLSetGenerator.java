@@ -158,6 +158,11 @@ public final class YSQLSetGenerator {
         YB_PUSHDOWN_IS_NOT_NULL("yb_pushdown_is_not_null", (r) -> Randomly.fromOptions("on", "off")),
         YB_PUSHDOWN_STRICT_INEQUALITY("yb_pushdown_strict_inequality", (r) -> Randomly.fromOptions("on", "off")),
         YB_BYPASS_COND_RECHECK("yb_bypass_cond_recheck", (r) -> Randomly.fromOptions("on", "off")),
+        // New-relation write fastpath (skips intents); the in-txn-blocks variant is on by default upstream.
+        YB_ENABLE_NEW_RELATION_FASTPATH_WRITE("yb_enable_new_relation_fastpath_write",
+                (r) -> Randomly.fromOptions("on", "off")),
+        YB_ENABLE_NEW_RELATION_FASTPATH_WRITE_IN_TXN_BLOCKS("yb_enable_new_relation_fastpath_write_in_txn_blocks",
+                (r) -> Randomly.fromOptions("on", "off")),
 
         // ===== TIER 3: Edge Cases =====
         // Prepared Statement Handling

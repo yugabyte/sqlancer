@@ -41,6 +41,13 @@ public final class YSQLDdlTransactionGenerator {
         errors.add("DDL statement is not allowed within a transaction block");
 
         StringBuilder sb = new StringBuilder("BEGIN;\n");
+        if (Randomly.getBoolean()) {
+            // Writes to a relation created or rewritten in this block can skip intents (on by default upstream).
+            sb.append("SET LOCAL yb_enable_new_relation_fastpath_write_in_txn_blocks = ")
+                    .append(Randomly.fromOptions("on", "off")).append(";\n");
+            errors.add("unrecognized configuration parameter");
+            errors.add("invalid value for parameter");
+        }
         int count = Randomly.smallNumber() + 1;
         for (int i = 0; i < count; i++) {
             SQLQueryAdapter ddl = randomDdl(globalState, tables);
@@ -48,6 +55,15 @@ public final class YSQLDdlTransactionGenerator {
             // Inherit each composed generator's tolerated errors - otherwise DDL-specific rejections (e.g. an index
             // expression with no default operator class) would leak out of the block as false positives.
             errors.add(ddl.getExpectedErrors());
+        }
+        if (Randomly.getBoolean()) {
+            // Write after the DDL so the new index or rewritten table is written inside the same block.
+            SQLQueryAdapter insert = YSQLInsertGenerator.insert(globalState);
+            sb.append(insert.getUnterminatedQueryString()).append(";\n");
+            errors.add(insert.getExpectedErrors());
+            // The insert is generated from the schema read before the block, which an ALTER above may have changed.
+            errors.addRegexString("column \"[^\"]+\" of relation \"[^\"]+\" does not exist");
+            errors.addRegexString("relation \"[^\"]+\" does not exist");
         }
         // Occasionally roll back to exercise DDL-transaction atomicity (the block must leave no schema change behind).
         sb.append(Randomly.getBooleanWithRatherLowProbability() ? "ROLLBACK;" : "COMMIT;");
