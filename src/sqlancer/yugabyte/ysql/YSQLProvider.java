@@ -265,7 +265,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         if (globalState.getDbmsSpecificOptions().createDatabases) {
             readFunctions(globalState);
             boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
-            int numTables = isCatalogTest ? Randomly.fromOptions(100, 110, 120) : Randomly.fromOptions(4, 5, 6);
+            int numTables = isCatalogTest ? Math.max(1, globalState.getDbmsSpecificOptions().catalogNumTables)
+                    : Randomly.fromOptions(4, 5, 6);
             createTables(globalState, numTables);
             prepareTables(globalState);
         }

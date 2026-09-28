@@ -50,6 +50,9 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
     @Parameter(names = "--create-databases", description = "Evaluate CREATE DATABASE commands (otherwise use existing)", arity = 1)
     public boolean createDatabases = true;
 
+    @Parameter(names = "--catalog-num-tables", description = "Number of tables the CATALOG oracle creates per database; every table, index and sequence counts toward the cluster's tablet replica limit", arity = 1)
+    public int catalogNumTables = 20;
+
     @Parameter(names = "--connection-url", description = "Specifies the URL for connecting to the YSQL server", arity = 1)
     public String connectionURL = String.format("jdbc:yugabytedb://%s:%d/yugabyte", YSQLOptions.DEFAULT_HOST,
             YSQLOptions.DEFAULT_PORT);
