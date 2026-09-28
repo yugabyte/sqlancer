@@ -35,6 +35,7 @@ public class YSQLPivotedQuerySynthesisOracle
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        YSQLErrors.addSubqueryErrors(errors); // generated expressions may embed a scalar subquery returning >1 row
     }
 
     /*

@@ -84,9 +84,11 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
                 return new YSQLPivotedQuerySynthesisOracle(globalState);
             }
 
+            // Not requiring rows everywhere: generation's TRUNCATE/DELETE leave some relation empty in almost every
+            // database, which made PQS discard them all. A pivot row from an empty subset skips just that query.
             @Override
             public boolean requiresAllTablesToContainRows() {
-                return true;
+                return false;
             }
         },
         HAVING {

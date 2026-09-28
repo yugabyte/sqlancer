@@ -193,6 +193,7 @@ public class YSQLAlterTableGenerator {
                     sb.append(" USING ").append(column.getName()).append("::text::").append(getTypeName(newType));
                 }
                 errors.add("cannot alter type of a column used by");
+                errors.add("cannot alter type of a column used in a policy definition");
                 errors.add("cannot cast");
                 errors.add("out of range");
                 break;

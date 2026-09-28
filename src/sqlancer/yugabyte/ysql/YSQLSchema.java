@@ -430,7 +430,7 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
             try (Statement s = con.createStatement()) {
                 ResultSet randomRowValues = s.executeQuery(randomRow);
                 if (!randomRowValues.next()) {
-                    throw new AssertionError("could not find random row! " + randomRow + "\n");
+                    throw new IgnoreMeException(); // a relation in the random subset is empty
                 }
                 for (int i = 0; i < getColumns().size(); i++) {
                     YSQLColumn column = getColumns().get(i);

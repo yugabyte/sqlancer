@@ -368,13 +368,24 @@ public final class Main {
             success = q.execute(globalState, fills);
             Main.nrSuccessfulActions.addAndGet(1);
             if (globalState.getOptions().loggerPrintFailed() || success) {
-                globalState.getState().logStatement(q);
+                logStatement(q);
             }
             return success;
         }
 
+        // Only the reducers and the serialized state replay statements with their expected errors. Otherwise keep
+        // just the text: a long-lived database (CATALOG) retains every statement until it is dropped.
+        private void logStatement(Query<C> q) {
+            MainOptions options = globalState.getOptions();
+            if (options.useReducer() || options.reduceAST() || options.serializeReproduceState()) {
+                globalState.getState().logStatement(q);
+            } else {
+                globalState.getState().logStatement(q.getLogString());
+            }
+        }
+
         public SQLancerResultSet executeAndGet(Query<C> q, String... fills) throws Exception {
-            globalState.getState().logStatement(q);
+            logStatement(q);
             SQLancerResultSet result;
             result = q.executeAndGet(globalState, fills);
             Main.nrSuccessfulActions.addAndGet(1);

@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql.oracle;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -25,12 +26,12 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
 
     private final List<YSQLProvider.Action> dmlActions = Arrays.asList(YSQLProvider.Action.INSERT,
             YSQLProvider.Action.UPDATE, YSQLProvider.Action.DELETE);
-    private final List<YSQLProvider.Action> catalogActions = Arrays.asList(YSQLProvider.Action.CREATE_INDEX,
-            YSQLProvider.Action.CREATE_VIEW, YSQLProvider.Action.REFRESH_VIEW, YSQLProvider.Action.CREATE_SEQUENCE,
-            YSQLProvider.Action.ALTER_TABLE, YSQLProvider.Action.SET_CONSTRAINTS, YSQLProvider.Action.DISCARD,
-            YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON, YSQLProvider.Action.ALTER_DATABASE,
-            YSQLProvider.Action.RESET_ROLE, YSQLProvider.Action.RESET, YSQLProvider.Action.ANALYZE,
-            YSQLProvider.Action.SET);
+    private final List<YSQLProvider.Action> catalogActions = new ArrayList<>(Arrays.asList(
+            YSQLProvider.Action.CREATE_INDEX, YSQLProvider.Action.CREATE_VIEW, YSQLProvider.Action.REFRESH_VIEW,
+            YSQLProvider.Action.CREATE_SEQUENCE, YSQLProvider.Action.ALTER_TABLE, YSQLProvider.Action.SET_CONSTRAINTS,
+            YSQLProvider.Action.DISCARD, YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON,
+            YSQLProvider.Action.ALTER_DATABASE, YSQLProvider.Action.RESET_ROLE, YSQLProvider.Action.RESET,
+            YSQLProvider.Action.ANALYZE, YSQLProvider.Action.SET));
     private final List<YSQLProvider.Action> diskActions = Arrays.asList(YSQLProvider.Action.TRUNCATE,
             YSQLProvider.Action.VACUUM);
 
@@ -39,6 +40,17 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
         this.con = state.getConnection();
         this.logger = state.getLogger();
         this.options = state.getOptions();
+        if (globalState.isPgCompatible()) {
+            // AMP: the PostgreSQL command generators run here continuously; three copies each weight them to
+            // about half of the catalog actions, since each generator covers 12 to 30 commands.
+            for (int i = 0; i < 3; i++) {
+                catalogActions.addAll(
+                        Arrays.asList(YSQLProvider.Action.PG_RELATION_DDL, YSQLProvider.Action.PG_USER_DEFINED_OBJECT,
+                                YSQLProvider.Action.PG_SESSION_COMMAND, YSQLProvider.Action.PG_EXTERNAL_OBJECT));
+            }
+            // Targets for ALTER POLICY and ALTER RULE, which otherwise exist only after database generation.
+            catalogActions.addAll(Arrays.asList(YSQLProvider.Action.CREATE_POLICY, YSQLProvider.Action.CREATE_RULE));
+        }
     }
 
     private YSQLProvider.Action getRandomAction(List<YSQLProvider.Action> actions) {
@@ -52,10 +64,11 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
                 SQLQueryAdapter createTable = YSQLTableGenerator.generate(tableName, true, globalState);
                 globalState.executeStatement(createTable);
                 globalState.getManager().incrementSelectQueryCount();
-                globalState.executeStatement(new SQLQueryAdapter("COMMIT", true));
             } catch (IgnoreMeException e) {
                 // do nothing
             }
+            // Also ends an aborted transaction, which would otherwise fail every retry of this loop.
+            globalState.executeStatement(new SQLQueryAdapter("COMMIT", true));
         }
     }
 

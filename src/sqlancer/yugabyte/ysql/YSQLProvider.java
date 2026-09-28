@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLDoBlockGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDomainGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLDropIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLExplainGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLExternalObjectGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLFunctionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLGrantRevokeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
@@ -57,9 +59,11 @@ import sqlancer.yugabyte.ysql.gen.YSQLNotifyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLPolicyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLPreparedStatementGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLRelationDdlGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLRuleGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSequenceGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLSessionCommandGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSimpleVectorGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLStatisticsGenerator;
@@ -70,6 +74,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLTriggerGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTruncateGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTypeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLUpdateGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLUserDefinedObjectGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLVacuumGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLViewGenerator;
 
@@ -165,6 +170,14 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             break;
         case VECTOR_TEST:
             nrPerformed = r.getInteger(0, 3);
+            break;
+        case PG_RELATION_DDL:
+        case PG_USER_DEFINED_OBJECT:
+            nrPerformed = isPgCompat ? r.getInteger(0, 6) : 0;
+            break;
+        case PG_SESSION_COMMAND:
+        case PG_EXTERNAL_OBJECT:
+            nrPerformed = isPgCompat ? r.getInteger(0, 4) : 0;
             break;
         case TRUNCATE:
             nrPerformed = isCatalogTest ? r.getInteger(0, 10) : r.getInteger(0, 15);
@@ -412,14 +425,48 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     private void createDatabaseSimple(YSQLGlobalState globalState, String entryDatabaseName) throws SQLException {
         try (Connection con = createConnectionSafely(entryURL, username, password)) {
             globalState.getState().logStatement(String.format("\\c %s;", entryDatabaseName));
-            globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
+            globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE)");
             createDatabaseCommand = getCreateDatabaseCommand(globalState);
             globalState.getState().logStatement(createDatabaseCommand);
+            dropSubscriptions(globalState, con);
+            // FORCE ends backends a killed earlier run left running here; print them, since each one is a hang.
+            try (Statement s = con.createStatement();
+                    ResultSet rs = s
+                            .executeQuery("SELECT pid, state, left(query, 300) FROM pg_stat_activity WHERE datname = '"
+                                    + databaseName + "'")) {
+                while (rs.next()) {
+                    System.err.println("Terminating leftover session " + rs.getInt(1) + " in " + databaseName + " ("
+                            + rs.getString(2) + "): " + rs.getString(3));
+                }
+            }
             try (Statement s = con.createStatement()) {
-                s.execute("DROP DATABASE IF EXISTS " + databaseName);
+                s.execute("DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE)");
             }
             try (Statement s = con.createStatement()) {
                 s.execute(createDatabaseCommand);
+            }
+        }
+    }
+
+    // A subscription blocks DROP DATABASE and can only be dropped from inside its own database.
+    private void dropSubscriptions(YSQLGlobalState globalState, Connection entryConnection) throws SQLException {
+        List<String> subscriptions = new ArrayList<>();
+        try (Statement s = entryConnection.createStatement(); ResultSet rs = s.executeQuery(
+                "SELECT s.subname FROM pg_subscription s JOIN pg_database d ON d.oid = s.subdbid WHERE d.datname = '"
+                        + databaseName + "'")) {
+            while (rs.next()) {
+                subscriptions.add(rs.getString(1));
+            }
+        }
+        if (subscriptions.isEmpty()) {
+            return;
+        }
+        String url = String.format("jdbc:postgresql://%s:%d/%s", host, port, databaseName);
+        try (Connection con = DriverManager.getConnection(url, username, password);
+                Statement s = con.createStatement()) {
+            for (String subscription : subscriptions) {
+                globalState.getState().logStatement("DROP SUBSCRIPTION " + subscription);
+                s.execute("DROP SUBSCRIPTION " + subscription);
             }
         }
     }
@@ -664,6 +711,11 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         GRANT_REVOKE(YSQLGrantRevokeGenerator::generate), //
         MERGE(YSQLMergeGenerator::create), //
         CREATE_TABLEGROUP(g -> YSQLTableGroupGenerator.create()), //
+        // PostgreSQL commands the other generators do not issue; PostgreSQL-compatible mode (AMP) only.
+        PG_RELATION_DDL(YSQLRelationDdlGenerator::create), //
+        PG_USER_DEFINED_OBJECT(YSQLUserDefinedObjectGenerator::create), //
+        PG_SESSION_COMMAND(YSQLSessionCommandGenerator::create), //
+        PG_EXTERNAL_OBJECT(YSQLExternalObjectGenerator::create), //
         VECTOR_TEST(g -> {
             // pgvector is not installable on this build - skip rather than emit guaranteed-failing vector SQL.
             if (!g.isVectorAvailable()) {
@@ -694,6 +746,13 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         @Override
         public SQLQueryAdapter getQuery(YSQLGlobalState state) throws Exception {
             return sqlQueryProvider.getQuery(state);
+        }
+
+        // These fail the same way on every attempt (view contents, no open transaction); 1000 retries of each kept
+        // PQS in database generation for its whole run.
+        @Override
+        public boolean canBeRetried() {
+            return this != REFRESH_VIEW && this != LOCK_TABLE && this != SAVEPOINT;
         }
     }
 

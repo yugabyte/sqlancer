@@ -210,6 +210,8 @@ public final class YSQLMergeGenerator {
         errors.add("column used in WHEN AND condition must appear in USING clause");
         errors.add("target row matched more than once");
         errors.add("WHEN NOT MATCHED BY SOURCE is not supported");
+        errors.add("can only be updated to DEFAULT"); // generated columns
+        errors.add("cannot insert a non-DEFAULT value into column");
 
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonInsertUpdateErrors(errors);
