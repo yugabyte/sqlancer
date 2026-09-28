@@ -112,6 +112,25 @@ public enum YSQLFunctionWithUnknownResult {
     },
     TO_ASCII("to_ascii", YSQLDataType.TEXT, YSQLDataType.TEXT), TO_HEX("to_hex", YSQLDataType.INT, YSQLDataType.TEXT),
     TRANSLATE("translate", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
+    LTRIM("ltrim", YSQLDataType.TEXT, YSQLDataType.TEXT),
+    LPAD("lpad", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.INT, YSQLDataType.TEXT) {
+        @Override
+        public YSQLExpression[] getArguments(YSQLDataType returnType, YSQLExpressionGenerator gen, int depth) {
+            // A small length literal, as for repeat(): a random INT length can allocate gigabytes.
+            YSQLExpression[] args = super.getArguments(returnType, gen, depth);
+            args[1] = YSQLConstant.createIntConstant(gen.globalState.getRandomly().getInteger(0, 100));
+            return args;
+        }
+    },
+    CHAR_LENGTH("char_length", YSQLDataType.INT, YSQLDataType.TEXT),
+    OCTET_LENGTH("octet_length", YSQLDataType.INT, YSQLDataType.TEXT),
+    STARTS_WITH("starts_with", YSQLDataType.BOOLEAN, YSQLDataType.TEXT, YSQLDataType.TEXT),
+    QUOTE_NULLABLE("quote_nullable", YSQLDataType.TEXT, YSQLDataType.TEXT),
+    // POSIX regular expression functions (PostgreSQL 15)
+    REGEXP_COUNT("regexp_count", YSQLDataType.INT, YSQLDataType.TEXT, YSQLDataType.TEXT),
+    REGEXP_INSTR("regexp_instr", YSQLDataType.INT, YSQLDataType.TEXT, YSQLDataType.TEXT),
+    REGEXP_LIKE("regexp_like", YSQLDataType.BOOLEAN, YSQLDataType.TEXT, YSQLDataType.TEXT),
+    REGEXP_SUBSTR("regexp_substr", YSQLDataType.TEXT, YSQLDataType.TEXT, YSQLDataType.TEXT),
     // mathematical functions
     // https://www.postgresql.org/docs/9.5/functions-math.html
     ABS("abs", YSQLDataType.REAL, YSQLDataType.REAL), CBRT("cbrt", YSQLDataType.REAL, YSQLDataType.REAL),
@@ -120,6 +139,12 @@ public enum YSQLFunctionWithUnknownResult {
     LOG("log", YSQLDataType.REAL), LOG2("log", YSQLDataType.REAL, YSQLDataType.REAL), PI("pi", YSQLDataType.REAL),
     POWER("power", YSQLDataType.REAL, YSQLDataType.REAL), TRUNC("trunc", YSQLDataType.REAL, YSQLDataType.INT),
     TRUNC2("trunc", YSQLDataType.REAL, YSQLDataType.INT, YSQLDataType.REAL), FLOOR("floor", YSQLDataType.REAL),
+    SIGN("sign", YSQLDataType.REAL, YSQLDataType.REAL),
+    MOD("mod", YSQLDataType.INT, YSQLDataType.INT, YSQLDataType.INT),
+    GCD("gcd", YSQLDataType.INT, YSQLDataType.INT, YSQLDataType.INT),
+    LCM("lcm", YSQLDataType.INT, YSQLDataType.INT, YSQLDataType.INT),
+    WIDTH_BUCKET("width_bucket", YSQLDataType.INT, YSQLDataType.REAL, YSQLDataType.REAL, YSQLDataType.REAL,
+            YSQLDataType.INT),
 
     // trigonometric functions - complete
     // https://www.postgresql.org/docs/12/functions-math.html#FUNCTIONS-MATH-TRIG-TABLE

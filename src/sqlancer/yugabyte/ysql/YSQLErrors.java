@@ -345,6 +345,10 @@ public final class YSQLErrors {
         errors.add("encoding conversion from UTF8 to ASCII not supported"); // to_ascii
         errors.add("negative substring length not allowed"); // substr
         errors.add("invalid mask length"); // set_masklen
+        errors.add("lower bound cannot equal upper bound"); // width_bucket
+        errors.add("count must be greater than zero"); // width_bucket
+        errors.add("cannot be NaN"); // width_bucket
+        errors.add("bounds must be finite"); // width_bucket
         errors.add("function yb_hash_code"); // yb_hash_code
         errors.add("undefined datatype given to yb_hash_code");
         errors.add("unsupported datatype given to yb_hash_code");
