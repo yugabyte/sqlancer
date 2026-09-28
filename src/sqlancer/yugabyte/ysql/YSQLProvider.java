@@ -49,6 +49,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLExplainGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLExternalObjectGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLFunctionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLGrantRevokeGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLIndexCheckGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLIndexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLInsertGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLLockTableGenerator;
@@ -247,6 +248,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case DDL_TRANSACTION:
             // Exercises the yb_ddl_transaction_block_enabled feature; no-op (tolerated error) when it is off.
             nrPerformed = isPgCompat ? 0 : r.getInteger(0, 3);
+            break;
+        case INDEX_CHECK:
+            // yb_index_check() is YugabyteDB-only.
+            nrPerformed = isPgCompat ? 0 : r.getInteger(0, 2);
             break;
         default:
             throw new AssertionError(a);
@@ -735,7 +740,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         }), //
         CREATE_STATISTICS(YSQLStatisticsGenerator::insert), //
         DROP_STATISTICS(YSQLStatisticsGenerator::remove), //
-        DDL_TRANSACTION(YSQLDdlTransactionGenerator::create);
+        DDL_TRANSACTION(YSQLDdlTransactionGenerator::create), //
+        INDEX_CHECK(YSQLIndexCheckGenerator::create);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

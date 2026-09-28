@@ -32,8 +32,8 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             YSQLProvider.Action.DISCARD, YSQLProvider.Action.DROP_INDEX, YSQLProvider.Action.COMMENT_ON,
             YSQLProvider.Action.ALTER_DATABASE, YSQLProvider.Action.RESET_ROLE, YSQLProvider.Action.RESET,
             YSQLProvider.Action.ANALYZE, YSQLProvider.Action.SET));
-    private final List<YSQLProvider.Action> diskActions = Arrays.asList(YSQLProvider.Action.TRUNCATE,
-            YSQLProvider.Action.VACUUM);
+    private final List<YSQLProvider.Action> diskActions = new ArrayList<>(
+            Arrays.asList(YSQLProvider.Action.TRUNCATE, YSQLProvider.Action.VACUUM));
 
     public YSQLCatalog(YSQLGlobalState globalState) {
         this.state = globalState;
@@ -50,6 +50,9 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             }
             // Targets for ALTER POLICY and ALTER RULE, which otherwise exist only after database generation.
             catalogActions.addAll(Arrays.asList(YSQLProvider.Action.CREATE_POLICY, YSQLProvider.Action.CREATE_RULE));
+        } else {
+            // Checks index/table consistency after the DDL and DML churn above.
+            diskActions.add(YSQLProvider.Action.INDEX_CHECK);
         }
     }
 
@@ -88,7 +91,7 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
                 // 40%: DML actions
                 randomAction = getRandomAction(dmlActions);
             } else {
-                // 15%: disk actions (truncate, vacuum)
+                // 15%: disk actions (truncate, vacuum, index check)
                 randomAction = getRandomAction(diskActions);
             }
             randomAction.getQuery(state).execute(state);
