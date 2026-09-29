@@ -372,6 +372,7 @@ public final class YSQLErrors {
         // A table in a publication that publishes UPDATE/DELETE needs a replica identity for those commands.
         errors.add("does not have a replica identity and publishes");
         errors.add("value too long for type character");
+        errors.add("bit string too long"); // a BIT(n)/BIT VARYING(n) column shorter than the written value
         errors.add("not found in view targetlist");
         errors.add("cannot perform INSERT RETURNING");
         errors.add("cannot perform UPDATE RETURNING");
