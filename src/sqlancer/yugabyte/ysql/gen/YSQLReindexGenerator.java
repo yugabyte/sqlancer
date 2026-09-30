@@ -1,7 +1,6 @@
 package sqlancer.yugabyte.ysql.gen;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
@@ -21,22 +20,22 @@ public final class YSQLReindexGenerator {
         errors.add("could not create unique index"); // CONCURRENT INDEX
         StringBuilder sb = new StringBuilder();
         sb.append("REINDEX");
-        // if (Randomly.getBoolean()) {
-        // sb.append(" VERBOSE");
-        // }
+        if (globalState.isPgCompatible() && Randomly.getBoolean()) {
+            sb.append(" (VERBOSE)");
+        }
         sb.append(" ");
         Scope scope = Randomly.fromOptions(Scope.values());
         switch (scope) {
         case INDEX:
-            sb.append("INDEX ");
+            sb.append("INDEX ").append(concurrently(globalState));
             List<YSQLIndex> indexes = globalState.getSchema().getRandomTable().getIndexes();
             if (indexes.isEmpty()) {
                 throw new IgnoreMeException();
             }
-            sb.append(indexes.stream().map(YSQLIndex::getIndexName).collect(Collectors.joining()));
+            sb.append(Randomly.fromList(indexes).getIndexName());
             break;
         case TABLE:
-            sb.append("TABLE ");
+            sb.append("TABLE ").append(concurrently(globalState));
             sb.append(globalState.getSchema().getRandomTable(t -> !t.isView()).getName());
             break;
         case DATABASE:
@@ -49,8 +48,15 @@ public final class YSQLReindexGenerator {
         errors.add("already contains data"); // FIXME bug report
         errors.add("does not exist"); // internal index
         errors.add("REINDEX is not yet implemented for partitioned indexes");
+        errors.add("cannot run inside a transaction block"); // CONCURRENTLY
+        errors.add("cannot reindex system catalogs concurrently");
+        errors.add("cannot reindex invalid index");
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(sb.toString(), errors);
+    }
+
+    private static String concurrently(YSQLGlobalState globalState) {
+        return globalState.isPgCompatible() && Randomly.getBoolean() ? "CONCURRENTLY " : "";
     }
 
     private enum Scope {

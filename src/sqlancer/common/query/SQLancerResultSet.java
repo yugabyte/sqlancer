@@ -50,6 +50,10 @@ public class SQLancerResultSet implements Closeable {
         return rs.getInt(colName);
     }
 
+    public int getColumnCount() throws SQLException {
+        return rs.getMetaData().getColumnCount();
+    }
+
     public boolean isClosed() throws SQLException {
         return rs.isClosed();
     }

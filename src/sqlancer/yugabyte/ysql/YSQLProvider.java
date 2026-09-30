@@ -36,6 +36,7 @@ import sqlancer.common.query.SQLancerResultSet;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterDatabaseGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLClusterGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCommentGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCopyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLCursorGenerator;
@@ -58,8 +59,10 @@ import sqlancer.yugabyte.ysql.gen.YSQLMaterializedViewRefresh;
 import sqlancer.yugabyte.ysql.gen.YSQLMergeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLNotifyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLParallelQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLPartitionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLPolicyGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLPreparedStatementGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLReindexGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLRelationDdlGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLRuleGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSavepointGenerator;
@@ -68,6 +71,7 @@ import sqlancer.yugabyte.ysql.gen.YSQLSessionCommandGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSetGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLSimpleVectorGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLStatisticsGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLStorageProbeGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTableGroupGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLTransactionGenerator;
@@ -149,8 +153,22 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case ANALYZE:
             nrPerformed = r.getInteger(0, 3);
             break;
-        case RESET_ROLE:
         case VACUUM:
+            // YugabyteDB ignores VACUUM; PostgreSQL-compatible mode gets the option-rich form.
+            nrPerformed = isPgCompat ? r.getInteger(0, 3) : 0;
+            break;
+        case PG_STORAGE_PROBE:
+            nrPerformed = isPgCompat ? r.getInteger(0, 4) : 0;
+            break;
+        case PARTITION:
+            // Partitioned tables accept no row until they have a partition.
+            nrPerformed = r.getInteger(0, 5);
+            break;
+        case CLUSTER:
+        case REINDEX:
+            nrPerformed = isPgCompat ? r.getInteger(0, 2) : 0;
+            break;
+        case RESET_ROLE:
         case SET_CONSTRAINTS:
         case SET:
         case COMMENT_ON:
@@ -267,6 +285,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
             boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
             int numTables = isCatalogTest ? Math.max(1, globalState.getDbmsSpecificOptions().catalogNumTables)
                     : Randomly.fromOptions(4, 5, 6);
+            if (globalState.isPgCompatible()) {
+                // AMP computes ship clear_buffer_cache(); plain PostgreSQL refuses and the probes skip it.
+                globalState.executeStatement(YSQLStorageProbeGenerator.createTestUtilsExtension());
+            }
             createTables(globalState, numTables);
             prepareTables(globalState);
         }
@@ -664,6 +686,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         UPDATE(YSQLUpdateGenerator::create), //
         TRUNCATE(YSQLTruncateGenerator::create), //
         VACUUM(YSQLVacuumGenerator::create), //
+        CLUSTER(YSQLClusterGenerator::create), //
+        REINDEX(YSQLReindexGenerator::create), //
+        PARTITION(YSQLPartitionGenerator::create), //
+        PG_STORAGE_PROBE(YSQLStorageProbeGenerator::create), //
         SET(YSQLSetGenerator::create), //
         SET_CONSTRAINTS((g) -> {
             String sb = "SET CONSTRAINTS ALL " + Randomly.fromOptions("DEFERRED", "IMMEDIATE");
@@ -759,7 +785,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         // PQS in database generation for its whole run.
         @Override
         public boolean canBeRetried() {
-            return this != REFRESH_VIEW && this != LOCK_TABLE && this != SAVEPOINT;
+            return this != REFRESH_VIEW && this != LOCK_TABLE && this != SAVEPOINT && this != VACUUM && this != CLUSTER
+                    && this != REINDEX;
         }
     }
 

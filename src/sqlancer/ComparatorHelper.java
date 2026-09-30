@@ -38,6 +38,18 @@ public final class ComparatorHelper {
 
     public static List<String> getResultSetFirstColumnAsString(String queryString, ExpectedErrors errors,
             SQLGlobalState<?, ?> state) throws SQLException {
+        return getResultSetAsString(queryString, errors, state, false);
+    }
+
+    // Like getResultSetFirstColumnAsString, but each row is every column, canonicalized one by one and joined with a
+    // separator, so a wrong value in any column is a mismatch.
+    public static List<String> getResultSetAllColumnsAsString(String queryString, ExpectedErrors errors,
+            SQLGlobalState<?, ?> state) throws SQLException {
+        return getResultSetAsString(queryString, errors, state, true);
+    }
+
+    private static List<String> getResultSetAsString(String queryString, ExpectedErrors errors,
+            SQLGlobalState<?, ?> state, boolean allColumns) throws SQLException {
         if (state.getOptions().logEachSelect()) {
             // TODO: refactor me
             state.getLogger().writeCurrent(queryString);
@@ -57,13 +69,18 @@ public final class ComparatorHelper {
             if (result == null) {
                 throw new IgnoreMeException();
             }
+            int columns = allColumns ? result.getColumnCount() : 1;
             while (result.next()) {
-                String resultTemp = result.getString(1);
-                if (resultTemp != null) {
-                    resultTemp = resultTemp.replaceAll("[\\.]0+$", ""); // Remove the trailing zeros as many DBMS treat
-                    // it as non-bugs
+                if (columns == 1) {
+                    resultSet.add(trimTrailingZeros(result.getString(1)));
+                    continue;
                 }
-                resultSet.add(resultTemp);
+                StringBuilder row = new StringBuilder();
+                for (int i = 1; i <= columns; i++) {
+                    row.append(i == 1 ? "" : "\u0001")
+                            .append(canonicalizeResultValue(trimTrailingZeros(result.getString(i))));
+                }
+                resultSet.add(row.toString());
             }
         } catch (Exception e) {
             if (e instanceof IgnoreMeException) {
@@ -176,6 +193,11 @@ public final class ComparatorHelper {
         combinedString.add(unionString);
         secondResultSet = getResultSetFirstColumnAsString(unionString, errors, state);
         return secondResultSet;
+    }
+
+    // Remove the trailing zeros as many DBMS treat it as non-bugs
+    private static String trimTrailingZeros(String value) {
+        return value == null ? null : value.replaceAll("[\\.]0+$", "");
     }
 
     public static String canonicalizeResultValue(String value) {

@@ -23,6 +23,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMergeScanQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLStorageProbeGenerator;
 
 /**
  * Differential Query Plan (DQP) oracle: runs one generated query under a series of plan-forcing configurations - each
@@ -67,6 +68,7 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
     };
 
     private final YSQLGlobalState state;
+    private boolean bufferCacheCanBeDropped = true;
     private final ExpectedErrors errors = new ExpectedErrors();
     private final ExpectedErrors gucErrors = new ExpectedErrors();
 
@@ -109,13 +111,17 @@ public class YSQLDQPOracle implements TestOracle<YSQLGlobalState> {
         }
 
         YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
-        List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
+        List<String> defaultResult = ComparatorHelper.getResultSetAllColumnsAsString(queryString, errors, state);
 
         for (String[] config : YSQLScanGUCOracle.flipsFor(PLAN_CONFIGS, PG_PLAN_CONFIGS, state.isPgCompatible())) {
             applyGuc(config, true);
             List<String> planResult;
+            if (state.isPgCompatible() && bufferCacheCanBeDropped) {
+                // AMP: read this configuration's pages from the page server (see YSQLScanGUCOracle).
+                bufferCacheCanBeDropped = YSQLStorageProbeGenerator.clearBufferCache().execute(state);
+            }
             try {
-                planResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
+                planResult = ComparatorHelper.getResultSetAllColumnsAsString(queryString, errors, state);
             } finally {
                 applyGuc(config, false);
             }

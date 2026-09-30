@@ -219,11 +219,20 @@ public enum YSQLFunctionWithUnknownResult {
     CASEFOLD("casefold", YSQLDataType.TEXT, YSQLDataType.TEXT),
     ARRAY_SORT("array_sort", YSQLDataType.INT_ARRAY, YSQLDataType.INT_ARRAY),
     ARRAY_REVERSE("array_reverse", YSQLDataType.INT_ARRAY, YSQLDataType.INT_ARRAY),
-    CRC32("crc32", YSQLDataType.BIGINT, YSQLDataType.BYTEA), CRC32C("crc32c", YSQLDataType.BIGINT, YSQLDataType.BYTEA);
+    CRC32("crc32", YSQLDataType.BIGINT, YSQLDataType.BYTEA), CRC32C("crc32c", YSQLDataType.BIGINT, YSQLDataType.BYTEA),
+
+    // PostgreSQL 16 (deterministic ones only: any_value, array_sample, array_shuffle and random_normal are not)
+    DATE_ADD("date_add", YSQLDataType.TIMESTAMPTZ, YSQLDataType.TIMESTAMPTZ, YSQLDataType.INTERVAL),
+    DATE_SUBTRACT("date_subtract", YSQLDataType.TIMESTAMPTZ, YSQLDataType.TIMESTAMPTZ, YSQLDataType.INTERVAL),
+    JSON_SCALAR_INT("json_scalar", YSQLDataType.JSON, YSQLDataType.INT),
+    JSON_SCALAR_TEXT("json_scalar", YSQLDataType.JSON, YSQLDataType.TEXT),
+    JSON_ARRAY_INT("json_array", YSQLDataType.JSON, YSQLDataType.INT, YSQLDataType.INT),
+    JSON_ARRAY_TEXT("json_array", YSQLDataType.JSON, YSQLDataType.TEXT, YSQLDataType.TEXT);
 
     // Functions that exist only in newer PostgreSQL; generated only in PostgreSQL-compatible mode (AMP).
     private static final Set<YSQLFunctionWithUnknownResult> PG_ONLY = EnumSet.of(JSON_EXISTS, JSON_VALUE, JSON_QUERY,
-            CASEFOLD, ARRAY_SORT, ARRAY_REVERSE, CRC32, CRC32C);
+            CASEFOLD, ARRAY_SORT, ARRAY_REVERSE, CRC32, CRC32C, DATE_ADD, DATE_SUBTRACT, JSON_SCALAR_INT,
+            JSON_SCALAR_TEXT, JSON_ARRAY_INT, JSON_ARRAY_TEXT);
 
     private final String functionName;
     private final YSQLDataType returnType;

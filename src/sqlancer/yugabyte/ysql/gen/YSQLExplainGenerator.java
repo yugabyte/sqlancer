@@ -1,5 +1,7 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.List;
+
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
@@ -34,41 +36,20 @@ public final class YSQLExplainGenerator {
 
         StringBuilder sb = new StringBuilder();
         sb.append("EXPLAIN ");
-        if (Randomly.getBoolean()) {
-            sb.append("(");
-            boolean first = true;
-            if (Randomly.getBoolean()) {
-                sb.append("ANALYZE TRUE");
-                first = false;
-            }
-            if (Randomly.getBoolean()) {
-                if (!first) {
-                    sb.append(", ");
-                }
-                sb.append("VERBOSE TRUE");
-                first = false;
-            }
-            if (Randomly.getBoolean()) {
-                if (!first) {
-                    sb.append(", ");
-                }
-                sb.append("COSTS ").append(Randomly.fromOptions("TRUE", "FALSE"));
-                first = false;
-            }
-            if (Randomly.getBoolean()) {
-                if (!first) {
-                    sb.append(", ");
-                }
-                sb.append("BUFFERS TRUE");
-                first = false;
-            }
-            if (Randomly.getBoolean()) {
-                if (!first) {
-                    sb.append(", ");
-                }
-                sb.append("FORMAT ").append(Randomly.fromOptions("TEXT", "JSON", "XML", "YAML"));
-            }
-            sb.append(") ");
+        List<String> options = Randomly.subset("ANALYZE TRUE", "VERBOSE TRUE",
+                "COSTS " + Randomly.fromOptions("TRUE", "FALSE"), "BUFFERS TRUE",
+                "FORMAT " + Randomly.fromOptions("TEXT", "JSON", "XML", "YAML"));
+        if (globalState.isPgCompatible()) {
+            // PostgreSQL 16-18; SERIALIZE, WAL and TIMING need ANALYZE, GENERIC_PLAN excludes it.
+            options.addAll(Randomly.subset("MEMORY TRUE", "SETTINGS TRUE", "SUMMARY TRUE"));
+            options.addAll(options.contains("ANALYZE TRUE") ? Randomly
+                    .subset("SERIALIZE " + Randomly.fromOptions("TEXT", "BINARY", "NONE"), "WAL TRUE", "TIMING FALSE")
+                    : Randomly.subset("GENERIC_PLAN TRUE"));
+            errors.add("requires ANALYZE");
+            errors.add("cannot be used together");
+        }
+        if (!options.isEmpty()) {
+            sb.append("(").append(String.join(", ", options)).append(") ");
         }
 
         YSQLTable table = globalState.getSchema().getRandomTable();

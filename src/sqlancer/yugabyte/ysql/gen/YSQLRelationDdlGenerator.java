@@ -1,10 +1,8 @@
 package sqlancer.yugabyte.ysql.gen;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
-import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.yugabyte.ysql.YSQLErrors;
@@ -28,7 +26,7 @@ public final class YSQLRelationDdlGenerator {
 
     private enum Kind {
         CREATE_TABLE_AS, SELECT_INTO, ALTER_VIEW, DROP_VIEW, ALTER_MATERIALIZED_VIEW, DROP_MATERIALIZED_VIEW,
-        ALTER_SEQUENCE, DROP_SEQUENCE, ALTER_INDEX, CREATE_SCHEMA, ALTER_SCHEMA, DROP_SCHEMA
+        ALTER_SEQUENCE, DROP_SEQUENCE, ALTER_INDEX, CREATE_SCHEMA, ALTER_SCHEMA, DROP_SCHEMA, SET_EXPRESSION
     }
 
     private YSQLRelationDdlGenerator() {
@@ -86,6 +84,7 @@ public final class YSQLRelationDdlGenerator {
         case ALTER_INDEX:
             sql = alterIndex(globalState);
             errors.add("cannot alter statistics on");
+            errors.add("unrecognized parameter"); // fillfactor on GIN, GiST, SP-GiST and BRIN indexes
             errors.add("column number");
             break;
         case CREATE_SCHEMA:
@@ -103,6 +102,9 @@ public final class YSQLRelationDdlGenerator {
             sql = "DROP SCHEMA " + Randomly.fromOptions("", "IF EXISTS ")
                     + YSQLCatalogNames.random(globalState, OWN_SCHEMAS) + Randomly.fromOptions("", " CASCADE");
             break;
+        case SET_EXPRESSION:
+            sql = setExpression(globalState);
+            break;
         default:
             throw new AssertionError();
         }
@@ -112,27 +114,16 @@ public final class YSQLRelationDdlGenerator {
     // New tables keep the source's column names, so the oracles use them like any other table.
     private static String createTableAs(YSQLGlobalState globalState) {
         YSQLTable source = globalState.getSchema().getRandomTable();
-        String target = newTableName(globalState);
+        String target = YSQLCatalogNames.newTableName(globalState);
         return "CREATE " + Randomly.fromOptions("", "UNLOGGED ", "TEMP ") + "TABLE " + target + " AS SELECT * FROM "
                 + source.getName() + where(globalState, source) + Randomly.fromOptions("", " WITH NO DATA");
     }
 
     private static String selectInto(YSQLGlobalState globalState) {
         YSQLTable source = globalState.getSchema().getRandomTable();
-        String target = newTableName(globalState);
+        String target = YSQLCatalogNames.newTableName(globalState);
         return "SELECT * INTO " + Randomly.fromOptions("", "UNLOGGED ", "TEMP ") + target + " FROM " + source.getName()
                 + where(globalState, source);
-    }
-
-    // The first free tN: dropped tables leave gaps, so the table count is often a name already in use.
-    private static String newTableName(YSQLGlobalState globalState) {
-        List<String> names = globalState.getSchema().getDatabaseTables().stream().map(YSQLTable::getName)
-                .collect(Collectors.toList());
-        int i = names.size();
-        while (names.contains(DBMSCommon.createTableName(i))) {
-            i++;
-        }
-        return DBMSCommon.createTableName(i);
     }
 
     private static String where(YSQLGlobalState globalState, YSQLTable table) {
@@ -181,6 +172,18 @@ public final class YSQLRelationDdlGenerator {
                 " CACHE " + Randomly.getNotCachedInteger(1, 20), " NO MAXVALUE", " NO MINVALUE",
                 " AS " + Randomly.fromOptions("smallint", "integer", "bigint"), " OWNED BY NONE");
         return "ALTER SEQUENCE " + sequence + String.join("", options);
+    }
+
+    // PostgreSQL 17 rewrite of a stored generated column. Re-applying its own expression rewrites the heap and
+    // its indexes without changing any value the oracles compare.
+    private static String setExpression(YSQLGlobalState globalState) {
+        String column = YSQLCatalogNames.random(globalState,
+                "SELECT c.relname || chr(1) || a.attname || chr(1) || pg_get_expr(d.adbin, d.adrelid)"
+                        + " FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum"
+                        + " JOIN pg_class c ON c.oid = d.adrelid WHERE a.attgenerated IN ('s', 'v')"
+                        + " AND c.relnamespace = 'public'::regnamespace");
+        String[] parts = column.split("\u0001", 3);
+        return "ALTER TABLE " + parts[0] + " ALTER COLUMN " + parts[1] + " SET EXPRESSION AS (" + parts[2] + ")";
     }
 
     private static String alterIndex(YSQLGlobalState globalState) {

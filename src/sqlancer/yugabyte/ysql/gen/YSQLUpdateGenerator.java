@@ -64,6 +64,13 @@ public final class YSQLUpdateGenerator extends AbstractUpdateGenerator<YSQLColum
                     : generator.generateExpression(YSQLDataType.BOOLEAN);
             sb.append(YSQLVisitor.asString(where));
         }
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            // PostgreSQL 18: old.* is the row before the update, new.* after; WITH renames the aliases.
+            errors.add("RETURNING must have at least one column"); // a table whose columns were all dropped
+            sb.append(" RETURNING ").append(globalState.isPgCompatible()
+                    ? Randomly.fromOptions("*", "old.*", "new.*", "old.*, new.*", "WITH (OLD AS o, NEW AS n) o.*, n.*")
+                    : "*");
+        }
     }
 
     @Override

@@ -3,6 +3,8 @@ package sqlancer.yugabyte.ysql.oracle;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,8 +24,10 @@ import sqlancer.yugabyte.ysql.YSQLVisitor;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLSelect;
+import sqlancer.yugabyte.ysql.gen.YSQLCatalogNames;
 import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLMergeScanQueryGenerator;
+import sqlancer.yugabyte.ysql.gen.YSQLStorageProbeGenerator;
 
 /**
  * Differential oracle that runs the same query twice, the second time with a result-preserving YugabyteDB planner GUC
@@ -138,9 +142,31 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "cpu_tuple_cost=100" }, //
             { "join_collapse_limit=1", "from_collapse_limit=1" }, //
             { "geqo_threshold=2" }, //
+            // Memory and I/O: spills to disk, read combining and prefetch depth change the storage reads, not the
+            // result. yb_amp.* is AMP's prefetch ring (a harmless placeholder setting on plain PostgreSQL).
+            { "work_mem='64kB'" }, //
+            { "work_mem='64kB'", "hash_mem_multiplier=1", "enable_sort=off" }, //
+            { "io_combine_limit=1" }, //
+            { "effective_io_concurrency=0" }, //
+            { "effective_io_concurrency=1000", "maintenance_io_concurrency=1000" }, //
+            { "yb_amp.readahead_buffer_size=16" }, //
+            { "yb_amp.readahead_buffer_size=1024", "effective_io_concurrency=64", "io_combine_limit=32" }, //
     };
 
+    // Types whose equal values always print the same, so grouping and min/max cannot pick a differently printed
+    // representative per plan (unlike 1.0 vs 1.00, -0 vs 0 or '1 day' vs '24 hours').
+    private static final EnumSet<YSQLDataType> EXACT_TYPES = EnumSet.of(YSQLDataType.SMALLINT, YSQLDataType.INT,
+            YSQLDataType.BIGINT, YSQLDataType.TEXT, YSQLDataType.VARCHAR, YSQLDataType.CHAR, YSQLDataType.DATE,
+            YSQLDataType.TIME, YSQLDataType.TIMESTAMP, YSQLDataType.TIMESTAMPTZ, YSQLDataType.BOOLEAN,
+            YSQLDataType.UUID, YSQLDataType.BYTEA, YSQLDataType.MONEY);
+    private static final String UNIQUE_KEYS = "SELECT c.relname || chr(1) || a.attname FROM pg_index i"
+            + " JOIN pg_class c ON c.oid = i.indrelid"
+            + " JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]"
+            + " WHERE i.indisunique AND i.indnatts = 1 AND i.indpred IS NULL AND i.indexprs IS NULL AND i.indisvalid"
+            + " AND c.relkind IN ('r', 'p') AND c.relnamespace = 'public'::regnamespace";
+
     private final YSQLGlobalState state;
+    private boolean bufferCacheCanBeDropped = true;
     private final ExpectedErrors errors = new ExpectedErrors();
     private final ExpectedErrors gucErrors = gucExpectedErrors();
 
@@ -199,17 +225,21 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         if (!state.isPgCompatible() && !bucketTables.isEmpty() && Randomly.getBoolean()) {
             queryString = YSQLMergeScanQueryGenerator.generate(Randomly.fromList(bucketTables));
         }
+        if (state.isPgCompatible() && Randomly.getBoolean()) {
+            queryString = pgShapedQuery(targetTables.getTables());
+        }
 
         capturePlan(queryString, "default");
         YSQLResultSizeGuard.skipIfTooLarge(queryString, errors, state);
-        List<String> defaultResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
+        List<String> defaultResult = ComparatorHelper.getResultSetAllColumnsAsString(queryString, errors, state);
 
         String[] flip = Randomly.fromList(flipsFor(GUC_FLIPS, PG_GUC_FLIPS, state.isPgCompatible()));
         List<String> flippedResult;
         try {
             applyGuc(flip, true);
             capturePlan(queryString, String.join(", ", flip));
-            flippedResult = ComparatorHelper.getResultSetFirstColumnAsString(queryString, errors, state);
+            dropBufferCache();
+            flippedResult = ComparatorHelper.getResultSetAllColumnsAsString(queryString, errors, state);
         } finally {
             applyGuc(flip, false);
         }
@@ -220,6 +250,43 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         }
         combined.add(queryString);
         ComparatorHelper.assumeResultSetsAreEqual(defaultResult, flippedResult, queryString, combined, state);
+    }
+
+    // Shapes the PostgreSQL 17/18 flips act on, which random WHERE-only queries never contain: a self-join on a unique
+    // key (self-join elimination), GROUP BY over reordered columns with ordered aggregates (group-by reordering,
+    // presorted aggregates) and DISTINCT over reordered columns (distinct reordering).
+    private String pgShapedQuery(List<YSQLTable> tables) {
+        if (Randomly.getBoolean()) {
+            String[] key = YSQLCatalogNames.random(state, UNIQUE_KEYS).split("\\u0001", 2);
+            return "SELECT a.*, b." + key[1] + " FROM " + key[0] + " a JOIN " + key[0] + " b ON a." + key[1] + " = b."
+                    + key[1];
+        }
+        YSQLTable table = Randomly.fromList(tables);
+        List<YSQLColumn> exact = table.getColumns().stream().filter(c -> EXACT_TYPES.contains(c.getType()))
+                .collect(Collectors.toList());
+        if (exact.isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        List<YSQLColumn> group = Randomly.nonEmptySubset(exact);
+        List<YSQLColumn> reversed = new ArrayList<>(group);
+        Collections.reverse(reversed);
+        String groupList = group.stream().map(YSQLColumn::getName).collect(Collectors.joining(", "));
+        String reversedList = reversed.stream().map(YSQLColumn::getName).collect(Collectors.joining(", "));
+        if (Randomly.getBoolean()) {
+            return "SELECT DISTINCT " + reversedList + " FROM " + table.getName() + " ORDER BY " + groupList;
+        }
+        String a = Randomly.fromList(exact).getName();
+        return "SELECT " + groupList + ", count(*), count(" + a + "), min(" + a + "), max(" + a + "), array_agg(" + a
+                + " ORDER BY " + a + ") FROM " + table.getName() + " GROUP BY " + reversedList + " ORDER BY "
+                + groupList;
+    }
+
+    // AMP: the flipped run then reads its pages from the page server instead of shared buffers. Plain PostgreSQL
+    // has no clear_buffer_cache(); after the first refusal this oracle stops asking.
+    private void dropBufferCache() throws SQLException {
+        if (state.isPgCompatible() && bufferCacheCanBeDropped) {
+            bufferCacheCanBeDropped = YSQLStorageProbeGenerator.clearBufferCache().execute(state);
+        }
     }
 
     private void capturePlan(String query, String configuration) throws SQLException {

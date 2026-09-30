@@ -50,6 +50,10 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
             }
             // Targets for ALTER POLICY and ALTER RULE, which otherwise exist only after database generation.
             catalogActions.addAll(Arrays.asList(YSQLProvider.Action.CREATE_POLICY, YSQLProvider.Action.CREATE_RULE));
+            // Storage maintenance and partitions, which rewrite, truncate and re-route heap pages.
+            catalogActions.addAll(Arrays.asList(YSQLProvider.Action.VACUUM, YSQLProvider.Action.CLUSTER,
+                    YSQLProvider.Action.REINDEX, YSQLProvider.Action.PARTITION, YSQLProvider.Action.PG_STORAGE_PROBE,
+                    YSQLProvider.Action.COPY_TO));
         } else {
             // Checks index/table consistency after the DDL and DML churn above.
             diskActions.add(YSQLProvider.Action.INDEX_CHECK);

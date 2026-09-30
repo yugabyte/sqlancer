@@ -77,8 +77,8 @@ public final class YSQLMergeGenerator {
         // WHEN clauses - ensure at least one WHEN clause is present
         boolean hasWhenMatched = Randomly.getBoolean();
         boolean hasWhenNotMatchedByTarget = Randomly.getBoolean();
-        // WHEN NOT MATCHED BY SOURCE is PostgreSQL 15 feature, not in YugabyteDB yet
-        boolean hasWhenNotMatchedBySource = false;
+        // WHEN NOT MATCHED BY SOURCE is PostgreSQL 17; YugabyteDB (PostgreSQL 15) does not have it yet.
+        boolean hasWhenNotMatchedBySource = globalState.isPgCompatible() && Randomly.getBoolean();
 
         // If no WHEN clause was selected, force at least one
         if (!hasWhenMatched && !hasWhenNotMatchedByTarget) {
@@ -211,6 +211,8 @@ public final class YSQLMergeGenerator {
         errors.add("target row matched more than once");
         errors.add("WHEN NOT MATCHED BY SOURCE is not supported");
         errors.add("can only be updated to DEFAULT"); // generated columns
+        // WHEN NOT MATCHED BY SOURCE plans the merge as a FULL JOIN
+        errors.add("FULL JOIN is only supported with merge-joinable or hash-joinable join conditions");
         errors.add("cannot insert a non-DEFAULT value into column");
 
         YSQLErrors.addCommonExpressionErrors(errors);

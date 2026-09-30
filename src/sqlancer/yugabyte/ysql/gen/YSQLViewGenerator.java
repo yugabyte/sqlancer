@@ -16,6 +16,7 @@ public final class YSQLViewGenerator {
 
     public static SQLQueryAdapter create(YSQLGlobalState globalState) {
         ExpectedErrors errors = new ExpectedErrors();
+        errors.add("cannot change name of view column"); // OR REPLACE after ALTER VIEW ... RENAME COLUMN
         StringBuilder sb = new StringBuilder("CREATE");
         boolean isMaterialized = Randomly.getBoolean();
         if (isMaterialized) {

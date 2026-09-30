@@ -28,6 +28,10 @@ public class SQLConnection implements SQLancerDBConnection {
         return connection.prepareStatement(arg);
     }
 
+    public Connection getConnection() {
+        return connection;
+    }
+
     public Statement createStatement() throws SQLException {
         return connection.createStatement();
     }

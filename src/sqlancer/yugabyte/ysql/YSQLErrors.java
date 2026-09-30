@@ -368,6 +368,7 @@ public final class YSQLErrors {
     }
 
     public static void addCommonInsertUpdateErrors(ExpectedErrors errors) {
+        errors.add("violates partition constraint"); // a row written to a partition directly, outside its bound
         errors.add("empty WITHOUT OVERLAPS value found"); // PostgreSQL 18 temporal keys reject empty ranges
         // A table in a publication that publishes UPDATE/DELETE needs a replica identity for those commands.
         errors.add("does not have a replica identity and publishes");

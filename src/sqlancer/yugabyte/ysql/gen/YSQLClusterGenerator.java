@@ -17,11 +17,16 @@ public final class YSQLClusterGenerator {
         errors.add("there is no previously clustered index for table");
         errors.add("cannot cluster a partitioned table");
         errors.add("access method does not support clustering");
-        StringBuilder sb = new StringBuilder("CLUSTER ");
+        errors.add("does not exist"); // a view, materialized view or index dropped since the schema was read
+        errors.add("is not a table or materialized view");
+        errors.add("is not an index for table");
+        StringBuilder sb = new StringBuilder(
+                globalState.isPgCompatible() && Randomly.getBoolean() ? "CLUSTER (VERBOSE) " : "CLUSTER ");
         if (Randomly.getBoolean()) {
             YSQLTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
             sb.append(table.getName());
-            if (Randomly.getBoolean() && !table.getIndexes().isEmpty()) {
+            // Without USING, CLUSTER needs an index marked clustered earlier, which is rarely there.
+            if (!table.getIndexes().isEmpty() && !Randomly.getBooleanWithRatherLowProbability()) {
                 sb.append(" USING ");
                 sb.append(table.getRandomIndex().getIndexName());
                 errors.add("cannot cluster on partial index");
