@@ -32,6 +32,9 @@ public final class YSQLPartitionGenerator {
         ExpectedErrors errors = new ExpectedErrors();
         YSQLErrors.addCommonTableErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        // ATTACH checks every row against the constraints copied by LIKE, which can raise any expression error.
+        YSQLErrors.addCommonExpressionErrors(errors);
+        YSQLErrors.addCommonRangeExpressionErrors(errors);
         // Bounds are random, so overlaps, a second DEFAULT, incompatible hash moduli and rows the new bound rejects
         // are all legitimate refusals.
         errors.add("partition");

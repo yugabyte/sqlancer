@@ -30,6 +30,21 @@ public class YSQLAlterTableGenerator {
     }
 
     public List<Action> getActions(ExpectedErrors errors) {
+        // What PostgreSQL refuses on partitioned tables and on partitions, which the partition generator creates.
+        errors.add("cannot specify storage parameters for a partitioned table");
+        errors.add("of only the partitioned table");
+        errors.add("from a column of a partition");
+        errors.add("cannot change inheritance of a partition");
+        errors.add("cannot add column to a partition");
+        errors.add("cannot alter inherited column");
+        errors.add("cannot drop inherited column");
+        errors.add("is marked NOT NULL in parent table");
+        errors.add("must be added to child tables too");
+        errors.add("cannot inherit from a partition");
+        errors.add("identity column of a partition");
+        errors.add("because it is part of the partition key");
+        errors.add("is not marked NOT NULL");
+        errors.add("cannot use NULLS NOT DISTINCT indexes"); // ADD PRIMARY KEY USING INDEX
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonInsertUpdateErrors(errors);
         YSQLErrors.addCommonTableErrors(errors);

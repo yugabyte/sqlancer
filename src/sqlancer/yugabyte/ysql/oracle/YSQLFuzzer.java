@@ -88,7 +88,13 @@ public class YSQLFuzzer implements TestOracle<YSQLGlobalState> {
             } else {
                 query = YSQLRandomQueryGenerator.createRandomQuery(Randomly.smallNumber() + 1, state);
             }
-            return new SQLQueryAdapter(YSQLVisitor.asString(query) + ";", errors);
+            String sql = YSQLVisitor.asString(query);
+            if (state.isPgCompatible()) {
+                // pgjdbc buffers the whole result; the larger PostgreSQL-mode tables (generate_series inserts) let a
+                // random cross join exhaust the heap.
+                YSQLResultSizeGuard.skipIfTooLarge(sql, errors, state);
+            }
+            return new SQLQueryAdapter(sql + ";", errors);
         }
     }
 }

@@ -127,7 +127,7 @@ public final class YSQLSessionCommandGenerator {
 
     // A row lock cannot fail midway and leave BEGIN open; a failed PREPARE rolls the transaction back itself.
     private static String twoPhaseCommit(YSQLGlobalState globalState) {
-        String table = globalState.getSchema().getRandomTable(t -> !t.isView()).getName();
+        String table = globalState.getSchema().getRandomTable(t -> !t.isView() && !t.isMaterializedView()).getName();
         String gid = "g_" + globalState.getDatabaseName() + "_" + Randomly.getNotCachedInteger(0, 1000000);
         return "BEGIN; SELECT * FROM " + table + " LIMIT 1 FOR UPDATE; PREPARE TRANSACTION '" + gid + "'; "
                 + Randomly.fromOptions("COMMIT", "ROLLBACK") + " PREPARED '" + gid + "'";

@@ -20,10 +20,17 @@ public final class YSQLClusterGenerator {
         errors.add("does not exist"); // a view, materialized view or index dropped since the schema was read
         errors.add("is not a table or materialized view");
         errors.add("is not an index for table");
+        errors.add("does not belong to table");
+        errors.add("cannot cluster on invalid index");
+        errors.add("cannot run inside a transaction block"); // the bare, database-wide form
         StringBuilder sb = new StringBuilder(
                 globalState.isPgCompatible() && Randomly.getBoolean() ? "CLUSTER (VERBOSE) " : "CLUSTER ");
-        if (Randomly.getBoolean()) {
-            YSQLTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
+        if (!Randomly.getBooleanWithRatherLowProbability()) { // a bare CLUSTER needs previously clustered tables
+            // A table with an index when there is one: CLUSTER without USING needs a previously clustered index.
+            YSQLTable table = globalState.getSchema().getDatabaseTables().stream()
+                    .anyMatch(t -> !t.isView() && !t.getIndexes().isEmpty())
+                            ? globalState.getSchema().getRandomTable(t -> !t.isView() && !t.getIndexes().isEmpty())
+                            : globalState.getSchema().getRandomTable(t -> !t.isView());
             sb.append(table.getName());
             // Without USING, CLUSTER needs an index marked clustered earlier, which is rarely there.
             if (!table.getIndexes().isEmpty() && !Randomly.getBooleanWithRatherLowProbability()) {

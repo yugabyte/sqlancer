@@ -67,6 +67,7 @@ public final class YSQLUserDefinedObjectGenerator {
         errors.add("nondeterministic collations are not supported");
         errors.add("cannot be cast");
         errors.add("cannot alter type of a column used");
+        errors.add("because it is part of the partition key"); // a collation applied to a partition-key column
         errors.add("function is not a procedure");
         String sql;
         switch (Randomly.fromOptions(Kind.values())) {

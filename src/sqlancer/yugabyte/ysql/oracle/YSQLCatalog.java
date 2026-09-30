@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.postgresql.core.BaseConnection;
+import org.postgresql.core.TransactionState;
+
 import sqlancer.IgnoreMeException;
 import sqlancer.Main;
 import sqlancer.MainOptions;
@@ -99,7 +102,25 @@ public class YSQLCatalog implements TestOracle<YSQLGlobalState> {
                 randomAction = getRandomAction(diskActions);
             }
             randomAction.getQuery(state).execute(state);
+            endFailedTransaction();
         }
         state.getManager().incrementSelectQueryCount();
+    }
+
+    // A multi-statement action that fails after its BEGIN leaves the session in an aborted transaction, and every
+    // later action would fail with "current transaction is aborted" until a table creation commits. PostgreSQL
+    // JDBC driver only; the YugabyteDB driver has no transaction-state accessor here.
+    private void endFailedTransaction() throws Exception {
+        if (!state.isPgCompatible()) {
+            return;
+        }
+        // Closed when the run ends, or when the server restarts after a backend crash, while this thread works.
+        if (state.getConnection().getConnection().isClosed()) {
+            return;
+        }
+        BaseConnection connection = state.getConnection().getConnection().unwrap(BaseConnection.class);
+        if (connection.getTransactionState() == TransactionState.FAILED) {
+            state.executeStatement(new SQLQueryAdapter("ROLLBACK", true));
+        }
     }
 }

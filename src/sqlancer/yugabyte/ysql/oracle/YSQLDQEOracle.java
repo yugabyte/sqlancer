@@ -54,6 +54,7 @@ public class YSQLDQEOracle extends DQEBase<YSQLGlobalState> implements TestOracl
         YSQLErrors.addCommonTableErrors(ddlErrors);
         YSQLErrors.addTransactionErrors(ddlErrors);
         ddlErrors.add("does not exist");
+        ddlErrors.add("cannot add column to a partition"); // the parent's ADD COLUMN reaches its partitions
         ddlErrors.add("already exists");
         // Other DDL generators may have already grown the table to the column limit before the aux columns are added.
         ddlErrors.add("tables can have at most 1600 columns");

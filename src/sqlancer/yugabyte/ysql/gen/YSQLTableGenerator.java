@@ -2,6 +2,7 @@ package sqlancer.yugabyte.ysql.gen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
 import sqlancer.common.DBMSCommon;
@@ -196,6 +197,15 @@ public class YSQLTableGenerator {
         YSQLErrors.addCommonExpressionErrors(errors);
         YSQLErrors.addCommonRangeExpressionErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
+        errors.add("has no default operator class"); // e.g. a json or geometric column as the key
+        if (!Randomly.getBooleanWithRatherLowProbability()) {
+            // Plain columns: random expressions are nearly always constant or of unknown type, which PostgreSQL
+            // rejects, so almost no partitioned table used to be created.
+            sb.append(Randomly.nonEmptySubset(columnsToBeAdded).stream().limit(n).map(YSQLColumn::getName)
+                    .collect(Collectors.joining(", ")));
+            sb.append(")");
+            return;
+        }
         for (int i = 0; i < n; i++) {
             if (i != 0) {
                 sb.append(", ");

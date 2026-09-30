@@ -25,6 +25,8 @@ public final class YSQLIndexGenerator {
 
     public static SQLQueryAdapter generate(YSQLGlobalState globalState) {
         ExpectedErrors errors = new ExpectedErrors();
+        // A session default_tablespace set by the SET action, on an index of a partitioned table.
+        errors.add("cannot specify default tablespace for partitioned relations");
         StringBuilder sb = new StringBuilder();
         sb.append("CREATE");
         boolean isUnique = Randomly.getBoolean();
