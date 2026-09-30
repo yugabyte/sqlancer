@@ -63,7 +63,14 @@ public class YSQLCERTOracle extends CERTOracleBase<YSQLGlobalState> implements T
 
         // Single table only: multi-table comma cross-joins make YB's estimate saturate at 1e9, which breaks the
         // monotonicity assumption and yields false positives. One relation keeps the estimate comparison meaningful.
-        YSQLTable table = Randomly.fromList(state.getSchema().getRandomTableNonEmptyTables().getTables());
+        // Views are excluded: PostgreSQL 18 estimates a LIMIT above a view's row estimate as the LIMIT itself, so a
+        // view with no LIMIT reads as fewer rows than the same view with one (amp runs 3ae29420 and 7305f883).
+        List<YSQLTable> tables = state.getSchema().getRandomTableNonEmptyTables().getTables().stream()
+                .filter(t -> !t.isView()).collect(Collectors.toList());
+        if (tables.isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        YSQLTable table = Randomly.fromList(tables);
         List<YSQLColumn> columns = table.getColumns();
         gen = new YSQLExpressionGenerator(state).setColumns(columns);
 
