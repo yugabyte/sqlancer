@@ -16,8 +16,11 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,6 +49,22 @@ public class TestYSQLSkipLockedOracle {
                         order[i] + " vs " + order[j]);
             }
         }
+    }
+
+    // A row can carry several strengths (an outer KEY SHARE plus a released savepoint's UPDATE); it conflicts when any
+    // of them does.
+    @Test
+    public void conflictingRowsUsesEveryHeldStrength() {
+        Map<String, Set<ForClause>> held = new HashMap<>();
+        held.put("a", EnumSet.of(ForClause.KEY_SHARE));
+        held.put("b", EnumSet.of(ForClause.KEY_SHARE, ForClause.UPDATE));
+        held.put("c", EnumSet.of(ForClause.SHARE));
+        assertEquals(new HashSet<>(Arrays.asList("a", "b", "c")),
+                YSQLSkipLockedOracle.conflictingRows(held, ForClause.UPDATE));
+        assertEquals(new HashSet<>(Arrays.asList("b")),
+                YSQLSkipLockedOracle.conflictingRows(held, ForClause.KEY_SHARE));
+        assertEquals(new HashSet<>(Arrays.asList("b", "c")),
+                YSQLSkipLockedOracle.conflictingRows(held, ForClause.NO_KEY_UPDATE));
     }
 
     @Test

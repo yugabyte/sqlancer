@@ -54,6 +54,37 @@ public final class YugabyteBugs {
     // same-value updates of primary-key columns.
     public static boolean bugSameValuePrimaryKeyUpdateTakesNoLock = true;
 
+    // YSQL: under SERIALIZABLE, "FOR <strength> SKIP LOCKED" and "NOWAIT" only raise a WARNING ("not supported yet for
+    // SERIALIZABLE isolation") and then wait like a plain lock. While this holds, YSQLSkipLockedOracle does not run the
+    // SKIP LOCKED / NOWAIT reader under SERIALIZABLE in YugabyteDB mode.
+    // https://github.com/yugabyte/yugabyte-db/issues/11761
+    public static boolean bugSkipLockedUnsupportedInSerializable = true;
+
+    // YSQL: a row lock wait does not honor lock_timeout; "SET lock_timeout = '500ms'" then a conflicting
+    // "SELECT ... FOR UPDATE" waits for the holder instead of failing with "canceling statement due to lock timeout",
+    // at every isolation level. While this holds, YSQLSkipLockedOracle does not run its lock_timeout reader in
+    // YugabyteDB mode.
+    // https://github.com/yugabyte/yugabyte-db/issues/29549
+    public static boolean bugRowLockIgnoresLockTimeout = true;
+
+    // YSQL: a SERIALIZABLE transaction's reads lock coarsely (not just the rows read). After "SELECT ... WHERE k IN
+    // (1, 2)" in a SERIALIZABLE transaction, another session's "FOR UPDATE SKIP LOCKED" skips every row of the table.
+    // While this holds, YSQLSkipLockedOracle does not use SERIALIZABLE for the lock holder in YugabyteDB mode.
+    // https://github.com/yugabyte/yugabyte-db/issues/9517
+    public static boolean bugSerializableReadsLockCoarsely = true;
+
+    // YSQL: on a range-partitioned table, "SELECT ... FOR UPDATE NOWAIT" on rows another READ COMMITTED transaction
+    // holds FOR SHARE fails with "could not serialize access due to concurrent update (yb_max_query_layer_retries ...
+    // exhausted)" instead of "could not obtain lock on row"; a plain table gives the right error. While this holds,
+    // YSQLSkipLockedOracle does not use NOWAIT on its partitioned table in YugabyteDB mode.
+    public static boolean bugNowaitOnPartitionedTableRetriesAsConflict = true;
+
+    // YSQL: on a table with 2+ tablets, a row that "SELECT ... FOR NO KEY UPDATE SKIP LOCKED" skipped (another
+    // transaction holds it FOR SHARE) stays invisible to a third session's "FOR SHARE SKIP LOCKED" until the skipping
+    // transaction ends, although it returned no rows and pg_locks shows no lock of its own. One tablet is correct.
+    // While this holds, YSQLSkipLockedOracle lets its second consumer also skip the rows the first consumer skipped.
+    public static boolean bugSkippedRowStaysLockedOnMultiTabletTable = true;
+
     private YugabyteBugs() {
     }
 
