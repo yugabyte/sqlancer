@@ -174,7 +174,10 @@ public final class YSQLErrors {
     }
 
     public static void addCommonExpressionErrors(ExpectedErrors errors) {
-        errors.add("unsupported Unicode escape sequence"); // JSON input with a Unicode escape the encoding cannot hold
+        errors.add("unsupported Unicode escape sequence");
+        errors.add("could not determine interpretation of row comparison operator"); // a type with no btree ordering //
+                                                                                     // JSON input with a Unicode escape
+                                                                                     // the encoding cannot hold
         // Any expression may embed a TLP subquery (createSubquery), which may carry a row-locking clause.
         addRowLockingErrors(errors);
         errors.add("invalid line specification");

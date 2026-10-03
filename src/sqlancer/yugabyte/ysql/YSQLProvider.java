@@ -467,8 +467,24 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
                             + rs.getString(2) + "): " + rs.getString(3));
                 }
             }
-            try (Statement s = con.createStatement()) {
-                s.execute("DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE)");
+            // FORCE waits only 5 s for the terminated backends to exit; one busy in a long uninterruptible step can
+            // outlast that, so try again before giving up.
+            for (int attempt = 1;; attempt++) {
+                try (Statement s = con.createStatement()) {
+                    s.execute("DROP DATABASE IF EXISTS " + databaseName + " WITH (FORCE)");
+                    break;
+                } catch (SQLException e) {
+                    if (attempt == 3 || e.getMessage() == null
+                            || !e.getMessage().contains("is being accessed by other users")) {
+                        throw e;
+                    }
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                }
             }
             try (Statement s = con.createStatement()) {
                 s.execute(createDatabaseCommand);

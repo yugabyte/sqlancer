@@ -421,11 +421,13 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
         }
 
         public YSQLRowValue getRandomRowValue(SQLConnection con) throws SQLException {
-            String randomRow = String.format("SELECT %s FROM %s ORDER BY RANDOM() LIMIT 1", columnNamesAsString(
+            // One random row per table, not ORDER BY RANDOM() over their cross join: the same distribution, but it
+            // stays cheap when the tables hold thousands of rows (the cross join used to hit the statement timeout).
+            String randomRow = String.format("SELECT %s FROM %s", columnNamesAsString(
                     c -> c.getTable().getName() + "." + c.getName() + " AS " + c.getTable().getName() + c.getName()),
-                    // columnNamesAsString(c -> "typeof(" + c.getTable().getName() + "." +
-                    // c.getName() + ")")
-                    tableNamesAsString());
+                    getTables().stream()
+                            .map(t -> "(SELECT * FROM " + t.getName() + " ORDER BY RANDOM() LIMIT 1) AS " + t.getName())
+                            .collect(Collectors.joining(", ")));
             Map<YSQLColumn, YSQLConstant> values = new HashMap<>();
             try (Statement s = con.createStatement()) {
                 ResultSet randomRowValues = s.executeQuery(randomRow);
