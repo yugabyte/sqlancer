@@ -87,6 +87,18 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/34752
     public static boolean bugSkippedRowStaysLockedOnMultiTabletTable = true;
 
+    // YSQL debug builds: "ALTER TABLE ONLY t DROP CONSTRAINT c" fails Assert(cmd->subtype != AT_DropConstraint) in
+    // yb_cmds.c and crashes the backend. While this holds, ALTER TABLE does not combine ONLY with DROP CONSTRAINT on
+    // servers with debug_assertions = on.
+    // https://github.com/yugabyte/yugabyte-db/issues/26227
+    public static boolean bugAlterTableOnlyDropConstraintAssert = true;
+
+    // YSQL debug builds: an UPDATE that moves a primary key built on a stored generated column fails
+    // Assert(skip_entities_initially_empty) in ybOptimizeModifyTable.c and crashes the backend. While this holds, the
+    // hash-bucket table (generated column first in the primary key) is not created on servers with debug_assertions.
+    // https://github.com/yugabyte/yugabyte-db/issues/33617
+    public static boolean bugGeneratedPrimaryKeyUpdateAssert = true;
+
     private YugabyteBugs() {
     }
 

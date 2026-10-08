@@ -27,6 +27,8 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
     // Whether the pgvector extension can be created on this cluster. Detected once at connection setup so the
     // VECTOR_TEST action is skipped entirely on builds without pgvector instead of emitting guaranteed-failing SQL.
     private boolean vectorAvailable;
+    // Whether the server is a build with assertions (debug_assertions = on); some known bugs only trip assertions.
+    private boolean debugAssertions;
     private List<Character> allowedFunctionTypes = Arrays.asList(IMMUTABLE, STABLE, VOLATILE);
 
     @Override
@@ -37,9 +39,22 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
             this.operators = getOperators(getConnection());
             this.collates = getCollnames(getConnection());
             this.vectorAvailable = checkVectorAvailable(getConnection());
+            this.debugAssertions = checkDebugAssertions(getConnection());
         } catch (SQLException e) {
             throw new AssertionError(e);
         }
+    }
+
+    private boolean checkDebugAssertions(SQLConnection con) {
+        try (Statement s = con.createStatement(); ResultSet rs = s.executeQuery("SHOW debug_assertions")) {
+            return rs.next() && "on".equals(rs.getString(1));
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    public boolean hasDebugAssertions() {
+        return debugAssertions;
     }
 
     // Read-only probe of pg_available_extensions; swallows its own errors so connection setup is never broken by it.

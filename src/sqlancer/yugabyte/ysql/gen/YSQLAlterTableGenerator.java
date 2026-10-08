@@ -7,6 +7,7 @@ import sqlancer.Randomly;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
@@ -132,7 +133,9 @@ public class YSQLAlterTableGenerator {
         List<Action> action = getActions(errors);
         StringBuilder sb = new StringBuilder();
         sb.append("ALTER TABLE ");
-        if (Randomly.getBoolean()) {
+        boolean onlyAsserts = YugabyteBugs.bugAlterTableOnlyDropConstraintAssert && globalState.hasDebugAssertions()
+                && action.contains(Action.DROP_CONSTRAINT);
+        if (!onlyAsserts && Randomly.getBoolean()) {
             sb.append(" ONLY");
             errors.add("cannot use ONLY for foreign key on partitioned table");
         }

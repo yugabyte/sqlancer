@@ -8,6 +8,7 @@ import sqlancer.Randomly;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
@@ -76,7 +77,10 @@ public class YSQLTableGenerator {
     }
 
     private SQLQueryAdapter generate() {
-        if (!globalState.isPgCompatible() && !generateOnlyKnown && Randomly.getBooleanWithRatherLowProbability()) {
+        boolean bucketTableAsserts = YugabyteBugs.bugGeneratedPrimaryKeyUpdateAssert
+                && globalState.hasDebugAssertions();
+        if (!globalState.isPgCompatible() && !generateOnlyKnown && !bucketTableAsserts
+                && Randomly.getBooleanWithRatherLowProbability()) {
             return generateHashBucketTable(tableName);
         }
         if (globalState.isPgCompatible() && !generateOnlyKnown && Randomly.getBooleanWithRatherLowProbability()) {
