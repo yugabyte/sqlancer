@@ -73,16 +73,18 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/9517
     public static boolean bugSerializableReadsLockCoarsely = true;
 
-    // YSQL: on a range-partitioned table, "SELECT ... FOR UPDATE NOWAIT" on rows another READ COMMITTED transaction
-    // holds FOR SHARE fails with "could not serialize access due to concurrent update (yb_max_query_layer_retries ...
-    // exhausted)" instead of "could not obtain lock on row"; a plain table gives the right error. While this holds,
+    // YSQL: on a partitioned table, "SELECT ... FOR UPDATE NOWAIT" on a row another transaction holds fails with
+    // "could not serialize access ... (yb_max_query_layer_retries ... exhausted)" (40001) instead of "could not obtain
+    // lock on row" (55P03) when that row is not in the last partition scanned. While this holds,
     // YSQLSkipLockedOracle does not use NOWAIT on its partitioned table in YugabyteDB mode.
+    // https://github.com/yugabyte/yugabyte-db/issues/34844
     public static boolean bugNowaitOnPartitionedTableRetriesAsConflict = true;
 
     // YSQL: on a table with 2+ tablets, a row that "SELECT ... FOR NO KEY UPDATE SKIP LOCKED" skipped (another
     // transaction holds it FOR SHARE) stays invisible to a third session's "FOR SHARE SKIP LOCKED" until the skipping
-    // transaction ends, although it returned no rows and pg_locks shows no lock of its own. One tablet is correct.
+    // transaction ends: the skipped request stays registered as a granted row lock. One tablet is correct.
     // While this holds, YSQLSkipLockedOracle lets its second consumer also skip the rows the first consumer skipped.
+    // https://github.com/yugabyte/yugabyte-db/issues/34752
     public static boolean bugSkippedRowStaysLockedOnMultiTabletTable = true;
 
     private YugabyteBugs() {
