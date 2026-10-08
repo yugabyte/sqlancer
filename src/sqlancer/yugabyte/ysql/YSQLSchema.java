@@ -17,6 +17,7 @@ import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.SQLConnection;
 import sqlancer.common.DBMSCommon;
+import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.schema.AbstractRelationalTable;
 import sqlancer.common.schema.AbstractRowValue;
 import sqlancer.common.schema.AbstractSchema;
@@ -430,7 +431,18 @@ public class YSQLSchema extends AbstractSchema<YSQLGlobalState, YSQLTable> {
                             .collect(Collectors.joining(", ")));
             Map<YSQLColumn, YSQLConstant> values = new HashMap<>();
             try (Statement s = con.createStatement()) {
-                ResultSet randomRowValues = s.executeQuery(randomRow);
+                ResultSet randomRowValues;
+                try {
+                    randomRowValues = s.executeQuery(randomRow);
+                } catch (SQLException e) {
+                    // A view column can fail at read time (e.g. a non-contiguous range difference): no pivot row then.
+                    ExpectedErrors errors = new ExpectedErrors();
+                    YSQLErrors.addCommonExpressionErrors(errors);
+                    if (e.getMessage() != null && errors.errorIsExpected(e.getMessage())) {
+                        throw new IgnoreMeException();
+                    }
+                    throw e;
+                }
                 if (!randomRowValues.next()) {
                     throw new IgnoreMeException(); // a relation in the random subset is empty
                 }

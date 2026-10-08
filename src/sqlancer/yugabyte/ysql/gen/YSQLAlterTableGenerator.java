@@ -138,6 +138,7 @@ public class YSQLAlterTableGenerator {
         if (!onlyAsserts && Randomly.getBoolean()) {
             sb.append(" ONLY");
             errors.add("cannot use ONLY for foreign key on partitioned table");
+            errors.add("cannot remove constraint from only the partitioned table when partitions exist");
         }
         sb.append(" ");
         sb.append(randomTable.getName());

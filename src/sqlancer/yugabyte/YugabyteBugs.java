@@ -99,6 +99,11 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/33617
     public static boolean bugGeneratedPrimaryKeyUpdateAssert = true;
 
+    // YSQL: yb_index_check() is marked PARALLEL SAFE, but in a parallel worker (for example with
+    // force_parallel_mode = on, which the generators can set) it fails with "cannot update SecondarySnapshot during a
+    // parallel operation". While this holds, YSQLIndexCheckGenerator expects that error.
+    public static boolean bugIndexCheckFailsInParallelWorker = true;
+
     private YugabyteBugs() {
     }
 

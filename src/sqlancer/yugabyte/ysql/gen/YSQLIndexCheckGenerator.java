@@ -6,6 +6,7 @@ import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLIndex;
@@ -46,6 +47,9 @@ public final class YSQLIndexCheckGenerator {
         errors.add("does not exist");
         errors.add("was concurrently dropped");
         errors.add("permission denied for function yb_index_check");
+        if (YugabyteBugs.bugIndexCheckFailsInParallelWorker) {
+            errors.add("cannot update SecondarySnapshot during a parallel operation");
+        }
         YSQLErrors.addTransactionErrors(errors);
         return new SQLQueryAdapter(query, errors);
     }
