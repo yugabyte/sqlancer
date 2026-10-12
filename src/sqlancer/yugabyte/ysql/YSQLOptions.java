@@ -12,6 +12,7 @@ import sqlancer.OracleFactory;
 import sqlancer.common.oracle.CompositeTestOracle;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
+import sqlancer.yugabyte.ysql.oracle.YSQLBackwardScanOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCERTOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCODDTestOracle;
 import sqlancer.yugabyte.ysql.oracle.YSQLCatalog;
@@ -121,6 +122,12 @@ public class YSQLOptions implements DBMSSpecificOptions<YSQLOracleFactory> {
             @Override
             public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
                 return new YSQLSkipLockedOracle(globalState);
+            }
+        },
+        BACKWARD_SCAN {
+            @Override
+            public TestOracle<YSQLGlobalState> create(YSQLGlobalState globalState) throws SQLException {
+                return new YSQLBackwardScanOracle(globalState);
             }
         },
         CERT {

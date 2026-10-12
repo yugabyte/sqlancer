@@ -140,6 +140,10 @@ public final class YSQLSetGenerator {
         YB_ENABLE_HASH_BATCH_IN("yb_enable_hash_batch_in", (r) -> Randomly.fromOptions("on", "off")),
         YB_ENABLE_BATCHEDNL("yb_enable_batchednl", (r) -> Randomly.fromOptions("on", "off")),
         YB_BNL_BATCH_SIZE("yb_bnl_batch_size", (r) -> Randomly.fromOptions(1, 128, 1024, 4096)),
+        // master 2026-10: ANALYZE skips wide varlena values; DDL waits for the master's catalog prefetch wave
+        YB_ENABLE_ANALYZE_WIDTH_SKIP("yb_enable_analyze_width_skip", (r) -> Randomly.fromOptions("on", "off")),
+        YB_DDL_WAIT_FOR_MASTER_PREFETCH_DRAIN_MS("yb_ddl_wait_for_master_prefetch_drain_ms",
+                (r) -> Randomly.fromOptions(0, 1, 100, 1000)),
         YB_PREFER_BNL("yb_prefer_bnl", (r) -> Randomly.fromOptions("on", "off")),
         YB_ENABLE_BITMAPSCAN("yb_enable_bitmapscan", (r) -> Randomly.fromOptions("on", "off")),
         YB_ENABLE_PARALLEL_APPEND("yb_enable_parallel_append", (r) -> Randomly.fromOptions("on", "off")),
