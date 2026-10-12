@@ -26,6 +26,10 @@ import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTables;
 import sqlancer.yugabyte.ysql.YSQLVisitor;
+import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLBinaryArithmeticOperation.YSQLBinaryOperator;
+import sqlancer.yugabyte.ysql.ast.YSQLBinaryComparisonOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLExpression;
@@ -36,6 +40,13 @@ import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
 import sqlancer.yugabyte.ysql.oracle.tlp.YSQLTLPBase;
 
 public class YSQLNoRECOracle implements TestOracle<YSQLGlobalState> {
+
+    private static final List<YSQLDataType> EQUI_JOIN_TYPES = List.of(YSQLDataType.SMALLINT, YSQLDataType.INT,
+            YSQLDataType.BIGINT, YSQLDataType.NUMERIC, YSQLDataType.DECIMAL, YSQLDataType.REAL,
+            YSQLDataType.DOUBLE_PRECISION, YSQLDataType.VARCHAR, YSQLDataType.CHAR, YSQLDataType.TEXT);
+
+    private static final List<YSQLDataType> INTEGER_TYPES = List.of(YSQLDataType.SMALLINT, YSQLDataType.INT,
+            YSQLDataType.BIGINT);
 
     // Inlined from the upstream-removed NoRECBase (deleted as dead code in sqlancer/main).
     private final YSQLGlobalState state;
@@ -64,10 +75,20 @@ public class YSQLNoRECOracle implements TestOracle<YSQLGlobalState> {
             List<YSQLTable> tables) {
         List<YSQLJoin> joinStatements = new ArrayList<>();
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(globalState).setColumns(columns);
+        List<YSQLTable> joinedTables = new ArrayList<>();
         for (int i = 1; i < tables.size(); i++) {
-            YSQLExpression joinClause = gen.generateExpression(YSQLDataType.BOOLEAN);
             YSQLTable table = Randomly.fromList(tables);
             tables.remove(table);
+            joinedTables.add(table);
+        }
+        // Of the comma-separated FROM list, only the last table is visible to the ON clauses.
+        List<YSQLTable> visibleTables = new ArrayList<>(List.of(tables.get(tables.size() - 1)));
+        for (YSQLTable table : joinedTables) {
+            YSQLExpression joinClause = Randomly.getBoolean() ? null : getEquiJoinClause(table, visibleTables);
+            if (joinClause == null) {
+                joinClause = gen.generateExpression(YSQLDataType.BOOLEAN);
+            }
+            visibleTables.add(table);
             // A plain table reference cannot follow LATERAL, so restrict to non-LATERAL join types here. LATERAL
             // joins are added separately below against subqueries, where they are valid.
             YSQLJoin.YSQLJoinType options = YSQLJoin.YSQLJoinType.getRandomNonLateral();
@@ -95,6 +116,29 @@ public class YSQLNoRECOracle implements TestOracle<YSQLGlobalState> {
             joinStatements.add(new YSQLJoin(lateralSubquery, lateralOnClause, lateralType));
         }
         return joinStatements;
+    }
+
+    // "inner.c = outer.c" or "inner.c = outer1.c + outer2.c": an equality on a joined-table column, the shape a
+    // batched nested loop pushes into the inner index scan. Returns null when no column pair has a common type.
+    private static YSQLExpression getEquiJoinClause(YSQLTable table, List<YSQLTable> visibleTables) {
+        List<YSQLColumn> outerColumns = visibleTables.stream().flatMap(t -> t.getColumns().stream())
+                .filter(c -> EQUI_JOIN_TYPES.contains(c.getType())).collect(Collectors.toList());
+        List<YSQLColumn> innerColumns = table.getColumns().stream()
+                .filter(c -> outerColumns.stream().anyMatch(o -> o.getType() == c.getType()))
+                .collect(Collectors.toList());
+        if (innerColumns.isEmpty()) {
+            return null;
+        }
+        YSQLColumn inner = Randomly.fromList(innerColumns);
+        List<YSQLColumn> sameType = outerColumns.stream().filter(c -> c.getType() == inner.getType())
+                .collect(Collectors.toList());
+        YSQLExpression outer = YSQLColumnValue.create(Randomly.fromList(sameType), null);
+        if (INTEGER_TYPES.contains(inner.getType()) && Randomly.getBoolean()) {
+            outer = new YSQLBinaryArithmeticOperation(outer, YSQLColumnValue.create(Randomly.fromList(sameType), null),
+                    YSQLBinaryOperator.ADDITION);
+        }
+        return new YSQLBinaryComparisonOperation(YSQLColumnValue.create(inner, null), outer,
+                YSQLBinaryComparisonOperator.EQUALS);
     }
 
     @Override
