@@ -145,6 +145,10 @@ public enum YSQLFunctionWithUnknownResult {
     LCM("lcm", YSQLDataType.INT, YSQLDataType.INT, YSQLDataType.INT),
     WIDTH_BUCKET("width_bucket", YSQLDataType.INT, YSQLDataType.REAL, YSQLDataType.REAL, YSQLDataType.REAL,
             YSQLDataType.INT),
+    SCALE("scale", YSQLDataType.INT, YSQLDataType.NUMERIC),
+    MIN_SCALE("min_scale", YSQLDataType.INT, YSQLDataType.NUMERIC),
+    TRIM_SCALE("trim_scale", YSQLDataType.NUMERIC, YSQLDataType.NUMERIC),
+    DIV("div", YSQLDataType.NUMERIC, YSQLDataType.NUMERIC, YSQLDataType.NUMERIC),
 
     // trigonometric functions - complete
     // https://www.postgresql.org/docs/12/functions-math.html#FUNCTIONS-MATH-TRIG-TABLE
