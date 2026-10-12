@@ -28,11 +28,11 @@ public final class YugabyteBugs {
     // yugabyte-db#30815 (closed); no longer reproduces on master, so the error is reported again.
     public static boolean bugTimezoneNotRecognizedUnderPushdown;
 
-    // YSQL: yb_hash_code() allocates its key buffer with alloca(size) where size is the encoded size of its arguments,
-    // so an argument larger than the ~8 MB backend stack (e.g. yb_hash_code(repeat('x', 10000000))) crashes the backend
-    // with SIGSEGV. While unfixed, yb_hash_code only receives leaf arguments (constants or columns) so the fuzzer does
-    // not re-hit this crash; flip to false once fixed. https://github.com/yugabyte/yugabyte-db/issues/34210
-    public static boolean bugYbHashCodeUnboundedAlloca = true;
+    // YSQL: yb_hash_code() allocated its key buffer with alloca(size) where size is the encoded size of its arguments,
+    // so an argument larger than the ~8 MB backend stack (e.g. yb_hash_code(repeat('x', 10000000))) crashed the backend
+    // with SIGSEGV. Fixed on master by yugabyte-db a0310161797 (palloc); set to true against older builds to give
+    // yb_hash_code only leaf arguments (constants or columns). https://github.com/yugabyte/yugabyte-db/issues/34210
+    public static boolean bugYbHashCodeUnboundedAlloca;
 
     // YSQL: a batched nested loop pushes "yb_hash_code(k) = ANY(ARRAY[...])" into the inner index scan, and the
     // executor rejects it with "indexqual doesn't have key on left side" (e.g. t1 LEFT JOIN t4 ON
