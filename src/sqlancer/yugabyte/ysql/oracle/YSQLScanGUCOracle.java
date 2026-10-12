@@ -114,6 +114,10 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "yb_disable_parallel_query_in_ddl=on" }, //
             { "yb_enable_parallel_scan_system=on" }, //
             { "yb_plpgsql_disable_prefetch_in_for_query=on" }, //
+            // Leave every scan key unbound so DocDB returns all rows and PostgreSQL rechecks them (the path an
+            // out-of-range integer key takes, YB #34277), and drop DocKey lower/upper bounds on hash-sharded scans.
+            { "yb_test_skip_binding_scan_keys=on" }, //
+            { "yb_allow_dockey_bounds=off" }, //
     };
 
     // PostgreSQL 18 planner switches (plan-only, result-preserving), used in PostgreSQL-compatible mode (AMP)
