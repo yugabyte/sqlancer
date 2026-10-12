@@ -67,6 +67,7 @@ public final class YSQLStorageProbeGenerator {
             errors.add("could not create unique index");
             errors.add("functions in index expression must be marked IMMUTABLE");
             errors.add("has no default operator class"); // a text-like column of type name
+            errors.add("cannot cast type"); // the column changed type after the schema was read (CATALOG)
             break;
         case SUBTRANSACTION_LOCKS:
             sql = "DO $$ BEGIN FOR i IN 1.." + Randomly.getNotCachedInteger(5, 60) + " LOOP BEGIN PERFORM 1 FROM "
