@@ -601,7 +601,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         }
         YSQLColumn column = Randomly.fromList(getComparisonSafeColumns());
         YSQLExpression value = YSQLColumnValue.create(column, rw == null ? null : rw.getValues().get(column));
-        YSQLExpression parameter = generateConstant(r, column.getType());
+        YSQLExpression parameter = generateKeyConstant(column.getType());
         YSQLExpression equality = new YSQLBinaryComparisonOperation(value, parameter,
                 YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.EQUALS);
         int pattern = Randomly.fromOptions(0, 1, 2, 3, 4, 5);
@@ -633,7 +633,7 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             YSQLExpression nextValue = YSQLColumnValue.create(next, rw == null ? null : rw.getValues().get(next));
             if (pattern == 5) {
                 return new YSQLBinaryLogicalOperation(equality,
-                        new YSQLBinaryComparisonOperation(nextValue, generateConstant(r, next.getType()),
+                        new YSQLBinaryComparisonOperation(nextValue, generateKeyConstant(next.getType()),
                                 YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.EQUALS),
                         YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND);
             }
@@ -648,12 +648,24 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                     YSQLBinaryLogicalOperation.BinaryLogicalOperator.OR);
         case 4:
             return new YSQLInOperation(value,
-                    Arrays.asList(parameter, generateConstant(r, column.getType()), parameter,
+                    Arrays.asList(parameter, generateKeyConstant(column.getType()), parameter,
                             Randomly.getBoolean() ? parameter : YSQLConstant.createNullConstant()),
                     Randomly.getBoolean());
         default:
             throw new AssertionError();
         }
+    }
+
+    // An integer key the column type cannot hold (smallint_col = 100000, int_col = 2147483648): an index scan must
+    // treat the equality as unsatisfiable and an IN list must drop the element (YugabyteDB #34277, #26493).
+    private YSQLExpression generateKeyConstant(YSQLDataType type) {
+        if ((type == YSQLDataType.SMALLINT || type == YSQLDataType.INT)
+                && Randomly.getBooleanWithRatherLowProbability()) {
+            long max = type == YSQLDataType.SMALLINT ? Short.MAX_VALUE : Integer.MAX_VALUE;
+            long beyond = Randomly.fromOptions(1L, 2L, (long) r.getInteger(1, 100000));
+            return YSQLConstant.createIntConstant(Randomly.getBoolean() ? max + beyond : -max - 1 - beyond);
+        }
+        return generateConstant(r, type);
     }
 
     private YSQLExpression inOperation(int depth) {
