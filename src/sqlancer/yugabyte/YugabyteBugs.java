@@ -104,6 +104,12 @@ public final class YugabyteBugs {
     // parallel operation". While this holds, YSQLIndexCheckGenerator expects that error.
     public static boolean bugIndexCheckFailsInParallelWorker = true;
 
+    // YSQL: "BEGIN READ ONLY; ANALYZE t; COMMIT;" failed at COMMIT with "cannot execute DELETE in a read-only
+    // transaction" because the catalog version increment ran through the executor. Fixed on master by yugabyte-db
+    // 948a523f32a; set to true against older builds to tolerate the error.
+    // https://github.com/yugabyte/yugabyte-db/issues/34575
+    public static boolean bugAnalyzeInReadOnlyTransactionFails;
+
     private YugabyteBugs() {
     }
 
