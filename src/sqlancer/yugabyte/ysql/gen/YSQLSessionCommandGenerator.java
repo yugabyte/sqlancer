@@ -93,9 +93,12 @@ public final class YSQLSessionCommandGenerator {
                     + YSQLCatalogNames.random(globalState, ownRoles);
             break;
         case SESSION_AUTHORIZATION:
-            // One implicit transaction: SET LOCAL ends with it, and a failure leaves no transaction block open.
+            // Outside a transaction block this is one implicit transaction and SET LOCAL ends with it. Inside a BEGIN
+            // (the COMMIT action opens one) SET LOCAL lasts until COMMIT, so later DDL would run as a non-owner and
+            // fail with "must be owner"; the RESET ends the switch here. On failure the RESET does not run, but the
+            // SET did not take effect either.
             sql = "SET LOCAL SESSION AUTHORIZATION " + YSQLCatalogNames.random(globalState, ownRoles)
-                    + "; SELECT current_user, session_user";
+                    + "; SELECT current_user, session_user; RESET SESSION AUTHORIZATION";
             errors.add("permission denied");
             break;
         case DEFAULT_PRIVILEGES:
