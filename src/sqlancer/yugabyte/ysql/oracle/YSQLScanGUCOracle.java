@@ -1,6 +1,10 @@
 package sqlancer.yugabyte.ysql.oracle;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -14,6 +18,7 @@ import sqlancer.Randomly;
 import sqlancer.common.oracle.TestOracle;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
+import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
@@ -34,7 +39,8 @@ import sqlancer.yugabyte.ysql.gen.YSQLStorageProbeGenerator;
  * flipped to a non-default value (scan-method, join-method, and DocDB pushdown toggles). These GUCs only change the
  * physical plan, never the logical result, so both runs must return identical (unordered) result sets. A mismatch
  * indicates a planner / pushdown wrong-results bug - the class of bug that has historically shipped in YugabyteDB's
- * batched-nested-loop join and bitmap-scan paths.
+ * batched-nested-loop join and bitmap-scan paths. With small probability a check instead verifies that a parallel scan
+ * inside a plpgsql function sees the transaction's own inserts (checkParallelOwnWrites).
  */
 public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
 
@@ -169,6 +175,9 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             + " WHERE i.indisunique AND i.indnatts = 1 AND i.indpred IS NULL AND i.indexprs IS NULL AND i.indisvalid"
             + " AND c.relkind IN ('r', 'p') AND c.relnamespace = 'public'::regnamespace";
 
+    static final int OWN_WRITES_ROWS = 1000;
+    private static final int OWN_WRITES_TIMEOUT_MS = 20000;
+
     private final YSQLGlobalState state;
     private boolean bufferCacheCanBeDropped = true;
     private final ExpectedErrors errors = new ExpectedErrors();
@@ -207,6 +216,10 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
 
     @Override
     public void check() throws SQLException {
+        if (Randomly.getBooleanWithSmallProbability()) {
+            checkParallelOwnWrites();
+            return;
+        }
         YSQLTables targetTables = state.getSchema().getRandomTableNonEmptyTables();
         List<YSQLColumn> columns = targetTables.getColumns();
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(state).setColumns(columns);
@@ -316,5 +329,145 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
                 throw new IgnoreMeException();
             }
         }
+    }
+
+    // ypw.f_bulk inserts with one INSERT ... SELECT and counts with PERFORM; ypw.f_loop inserts row by row and counts
+    // with SELECT count(*) INTO. Both insert keys lo+1..lo+n and return the number of rows with k > OWN_WRITES_ROWS.
+    static String functionBody(boolean loop) {
+        String insert = loop ? "FOR i IN 1..n LOOP INSERT INTO ypw.t VALUES (lo + i, i); END LOOP;"
+                : "INSERT INTO ypw.t SELECT lo + s, s FROM generate_series(1, n) s;";
+        String count = loop ? "SELECT count(*) INTO cnt FROM ypw.t WHERE k > " + OWN_WRITES_ROWS + ";"
+                : "PERFORM * FROM ypw.t WHERE k > " + OWN_WRITES_ROWS + "; GET DIAGNOSTICS cnt = ROW_COUNT;";
+        return "CREATE OR REPLACE FUNCTION ypw." + (loop ? "f_loop" : "f_bulk")
+                + "(lo int, n int) RETURNS bigint AS $$ DECLARE cnt bigint; BEGIN " + insert + " " + count
+                + " RETURN cnt; END; $$ LANGUAGE plpgsql";
+    }
+
+    // In one transaction, plpgsql functions insert rows and then scan the table with a forced parallel plan. Each scan
+    // must see every row inserted so far, including rows the leader still buffers (#33196). Always rolls back.
+    private void checkParallelOwnWrites() throws SQLException {
+        if (YugabyteBugs.bugParallelWorkerMissesBufferedWrites) {
+            throw new IgnoreMeException();
+        }
+        boolean pg = state.isPgCompatible();
+        ensureOwnWritesScratch();
+        List<String> log = new ArrayList<>();
+        try (Connection a = openSession()) {
+            execute(a, "SET statement_timeout = " + OWN_WRITES_TIMEOUT_MS, log);
+            if (!pg) {
+                setIfSupported(a, "yb_test_force_parallel", Randomly.fromOptions("force", "force", "prefer"), log);
+                setIfSupported(a, "yb_speculatively_execute_pl_statements", Randomly.fromOptions("on", "on", "off"),
+                        log);
+                setIfSupported(a, "yb_whitelist_extra_statements_for_pl_speculative_execution",
+                        Randomly.fromOptions("on", "on", "off"), log);
+            }
+            execute(a, "SET parallel_setup_cost = 0", log);
+            execute(a, "SET parallel_tuple_cost = 0", log);
+            execute(a, "SET min_parallel_table_scan_size = 0", log);
+            execute(a, "SET max_parallel_workers_per_gather = " + Randomly.fromOptions(1, 2, 4), log);
+            execute(a, "SET parallel_leader_participation = " + Randomly.fromOptions("off", "off", "on"), log);
+            String isolation = Randomly.fromOptions("REPEATABLE READ", "REPEATABLE READ", "READ COMMITTED",
+                    "SERIALIZABLE");
+            execute(a, "BEGIN ISOLATION LEVEL " + isolation, log);
+            // Plan the scan once first: a cached parallel plan is what the upstream reproducer needs.
+            runOwnWrites(a, "EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF, SUMMARY OFF) SELECT * FROM ypw.t WHERE k > "
+                    + OWN_WRITES_ROWS, log);
+            int calls = 1 + (int) Randomly.getNotCachedInteger(0, 3);
+            int inserted = 0;
+            for (int i = 0; i < calls; i++) {
+                int n = 1 + (int) Randomly.getNotCachedInteger(0, 40);
+                String fn = Randomly.getBoolean() ? "ypw.f_bulk" : "ypw.f_loop";
+                long got = Long.parseLong(
+                        runOwnWrites(a, "SELECT " + fn + "(" + (OWN_WRITES_ROWS + inserted) + ", " + n + ")", log));
+                inserted += n;
+                if (got != inserted) {
+                    throw new AssertionError("parallel scan inside " + fn + " under " + isolation + " saw " + got
+                            + " of the transaction's " + inserted + " inserted rows\n" + String.join("\n", log));
+                }
+            }
+            long total = Long
+                    .parseLong(runOwnWrites(a, "SELECT count(*) FROM ypw.t WHERE k > " + OWN_WRITES_ROWS, log));
+            if (total != inserted) {
+                throw new AssertionError("parallel count under " + isolation + " saw " + total
+                        + " of the transaction's " + inserted + " inserted rows\n" + String.join("\n", log));
+            }
+            execute(a, "ROLLBACK", log);
+        }
+    }
+
+    // A GUC the server does not have (older build) or does not let us set is skipped, not reported.
+    private static void setIfSupported(Connection con, String name, String value, List<String> log) {
+        try {
+            execute(con, "SET " + name + " = " + value, log);
+        } catch (SQLException e) {
+            log.remove(log.size() - 1);
+        }
+    }
+
+    private static String runOwnWrites(Connection con, String sql, List<String> log) {
+        try {
+            return queryLast(con, sql, log);
+        } catch (SQLException e) {
+            String msg = String.valueOf(e.getMessage());
+            if (msg.contains("canceling statement due to statement timeout")) {
+                throw new AssertionError("statement did not finish in " + OWN_WRITES_TIMEOUT_MS + " ms (hang?)\n"
+                        + String.join("\n", log), e);
+            }
+            ExpectedErrors transactionErrors = new ExpectedErrors();
+            YSQLErrors.addTransactionErrors(transactionErrors);
+            if (transactionErrors.errorIsExpected(msg)) {
+                throw new IgnoreMeException();
+            }
+            throw new AssertionError("statement failed: " + msg + "\n" + String.join("\n", log), e);
+        }
+    }
+
+    // A 1000-row table and the two functions only the own-writes check uses.
+    private void ensureOwnWritesScratch() {
+        try (Statement s = state.getConnection().createStatement()) {
+            try (ResultSet rs = s.executeQuery("SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid ="
+                    + " c.relnamespace WHERE n.nspname = 'ypw' AND c.relname = 't') + (SELECT count(*) FROM pg_proc p"
+                    + " JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'ypw'"
+                    + " AND p.proname IN ('f_bulk', 'f_loop'))")) {
+                if (rs.next() && rs.getInt(1) == 3) {
+                    return;
+                }
+            }
+            s.execute("CREATE SCHEMA IF NOT EXISTS ypw");
+            s.execute("CREATE TABLE IF NOT EXISTS ypw.t (k int PRIMARY KEY, v int)");
+            s.execute("INSERT INTO ypw.t SELECT g, g FROM generate_series(1, " + OWN_WRITES_ROWS
+                    + ") g ON CONFLICT DO NOTHING");
+            s.execute("ANALYZE ypw.t");
+            s.execute(functionBody(false));
+            s.execute(functionBody(true));
+        } catch (SQLException e) {
+            throw new IgnoreMeException(); // a concurrent DDL or a missing feature; try again next check
+        }
+    }
+
+    private Connection openSession() throws SQLException {
+        try (Statement s = state.getConnection().createStatement()) {
+            String url = s.getConnection().getMetaData().getURL();
+            return DriverManager.getConnection(url, state.getOptions().getUserName(), state.getOptions().getPassword());
+        }
+    }
+
+    private static void execute(Connection con, String sql, List<String> log) throws SQLException {
+        log.add("-- " + sql + ";");
+        try (Statement s = con.createStatement()) {
+            s.execute(sql);
+        }
+    }
+
+    // The first column of the last row (EXPLAIN returns several rows; only its side effect matters).
+    private static String queryLast(Connection con, String sql, List<String> log) throws SQLException {
+        log.add("-- " + sql + ";");
+        String last = null;
+        try (Statement s = con.createStatement(); ResultSet rs = s.executeQuery(sql)) {
+            while (rs.next()) {
+                last = rs.getString(1);
+            }
+        }
+        return last;
     }
 }

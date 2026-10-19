@@ -36,4 +36,12 @@ public class TestYSQLPgCompatibleFlips {
     public void ampProviderIsNamedAmp() {
         assertEquals("amp", new YugabyteAmpProvider().getDBMSName());
     }
+
+    @Test
+    public void parallelFunctionsCountRowsAboveTheCommittedKeys() {
+        String bulk = YSQLScanGUCOracle.functionBody(false);
+        String loop = YSQLScanGUCOracle.functionBody(true);
+        assertTrue(bulk.contains("ypw.f_bulk") && bulk.contains("PERFORM * FROM ypw.t WHERE k > 1000"));
+        assertTrue(loop.contains("ypw.f_loop") && loop.contains("count(*) INTO cnt FROM ypw.t WHERE k > 1000"));
+    }
 }

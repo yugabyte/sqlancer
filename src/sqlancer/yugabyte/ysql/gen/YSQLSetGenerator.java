@@ -246,6 +246,10 @@ public final class YSQLSetGenerator {
                 (r) -> Randomly.fromOptions("false", "true")),
         YB_LSM_SEEK_COST_COEFFICIENT("yb_lsm_seek_cost_coefficient",
                 (r) -> Randomly.fromOptions(0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0)),
+        YB_SPECULATIVELY_EXECUTE_PL_STATEMENTS("yb_speculatively_execute_pl_statements",
+                (r) -> Randomly.fromOptions("off", "on")),
+        YB_WHITELIST_EXTRA_STATEMENTS_FOR_PL_SPECULATIVE_EXECUTION(
+                "yb_whitelist_extra_statements_for_pl_speculative_execution", (r) -> Randomly.fromOptions("off", "on")),
         // WAL/Durability
         WAL_COMPRESSION("wal_compression", (r) -> Randomly.fromOptions(1, 0)),
         COMMIT_DELAY("commit_delay", (r) -> r.getInteger(0, 10000)),

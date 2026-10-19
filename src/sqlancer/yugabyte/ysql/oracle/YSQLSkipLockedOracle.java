@@ -15,6 +15,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import sqlancer.IgnoreMeException;
@@ -59,6 +63,9 @@ import sqlancer.yugabyte.ysql.gen.YSQLExpressionGenerator;
  * ({@code ctid} in PostgreSQL-compatible mode). YugabyteDB mode skips what YugabyteDB documents as unsupported or has
  * an open issue for (see YugabyteBugs): SKIP LOCKED / NOWAIT under SERIALIZABLE, NOWAIT outside READ COMMITTED, the
  * lock_timeout wait, MERGE and prepared transactions.
+ * <p>
+ * With small probability a check instead verifies that ROLLBACK TO SAVEPOINT keeps the table lock taken before the
+ * savepoint, so a concurrent ADD CONSTRAINT waits for A (checkSavepointKeepsTableLock).
  */
 public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
 
@@ -79,6 +86,7 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
     // Everything a lock-holder or baseline statement may legitimately raise.
     private final ExpectedErrors setupErrors = new ExpectedErrors();
     private boolean scratchReady;
+    private Boolean objectLocking;
 
     private enum Target {
         USER_TABLE, PARENT, PARTITIONED
@@ -201,6 +209,10 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
     @Override
     public void check() throws SQLException {
         boolean pg = state.isPgCompatible();
+        if (Randomly.getBooleanWithSmallProbability()) {
+            checkSavepointKeepsTableLock(pg);
+            return;
+        }
         String isolationA = !pg && YugabyteBugs.bugSerializableReadsLockCoarsely ? Randomly.fromOptions(RU, RC, RR)
                 : Randomly.fromOptions(RU, RC, RR, SER);
         ReadPlan plan = new ReadPlan();
@@ -736,6 +748,137 @@ public class YSQLSkipLockedOracle implements TestOracle<YSQLGlobalState> {
             log.add("-- B: SET " + setting + ";");
         } catch (SQLException e) {
             // Parameter absent on this build; the read runs without it.
+        }
+    }
+
+    // The statements A runs between its violating write and B's ALTER: open savepoint(s), write, roll back.
+    static List<String> savepointStatements(int variant, String write) {
+        switch (variant) {
+        case 0:
+            return List.of("SAVEPOINT a", write, "ROLLBACK TO SAVEPOINT a");
+        case 1:
+            return List.of("SAVEPOINT a", write, "ROLLBACK TO SAVEPOINT a", "RELEASE SAVEPOINT a");
+        case 2:
+            return List.of("SAVEPOINT a", "SAVEPOINT b", write, "ROLLBACK TO SAVEPOINT b", "ROLLBACK TO SAVEPOINT a");
+        default:
+            return List.of("SAVEPOINT a", write, "SAVEPOINT b", write, "ROLLBACK TO SAVEPOINT a");
+        }
+    }
+
+    // A writes a row that violates CHECK (v < 10), then rolls back to a savepoint; B adds that constraint. A's table
+    // lock from before the savepoint must still block B until A ends (ROLLBACK TO SAVEPOINT released it, #34734).
+    private void checkSavepointKeepsTableLock(boolean pg) throws SQLException {
+        // Without object locks YugabyteDB DDL does not wait for DML at all, so there is no lock to keep.
+        if (!pg && !objectLockingEnabled()) {
+            throw new IgnoreMeException();
+        }
+        resetSavepointScratch();
+        List<String> log = Collections.synchronizedList(new ArrayList<>());
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Connection a = openSession(); Connection b = openSession()) {
+            execute(a, "SET statement_timeout = " + STATEMENT_TIMEOUT_MS, log, "A");
+            execute(b, "SET statement_timeout = " + STATEMENT_TIMEOUT_MS, log, "B");
+            execute(a, "BEGIN ISOLATION LEVEL " + Randomly.fromOptions(RC, RR), log, "A");
+            try {
+                execute(a, Randomly.getBoolean() ? "INSERT INTO ysp.t VALUES (2, 20)"
+                        : "UPDATE ysp.t SET v = 20 WHERE k = 1", log, "A");
+                if (!YugabyteBugs.bugRollbackToSavepointReleasesTableLocks) {
+                    String write = Randomly.fromOptions("INSERT INTO ysp.u VALUES (1) ON CONFLICT DO NOTHING",
+                            "UPDATE ysp.t SET v = v WHERE k = 1", "SELECT k FROM ysp.t WHERE k = 1 FOR UPDATE");
+                    for (String sql : savepointStatements((int) Randomly.getNotCachedInteger(0, 4), write)) {
+                        execute(a, sql, log, "A");
+                    }
+                }
+            } catch (SQLException e) {
+                throw new IgnoreMeException(); // A's own failure says nothing about the lock
+            }
+            Future<String> alter = executor.submit(() -> {
+                try {
+                    execute(b, "ALTER TABLE ysp.t ADD CONSTRAINT ysp_c CHECK (v < 10)", log, "B");
+                    return null;
+                } catch (SQLException e) {
+                    return String.valueOf(e.getMessage());
+                }
+            });
+            String error;
+            try {
+                Thread.sleep(300 + Randomly.getNotCachedInteger(0, 200));
+                try {
+                    execute(a, Randomly.getBooleanWithSmallProbability() ? "ROLLBACK" : "COMMIT", log, "A");
+                } catch (SQLException e) {
+                    log.add("-- A: failed: " + e.getMessage());
+                }
+                error = alter.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IgnoreMeException();
+            } catch (ExecutionException e) {
+                throw new AssertionError("ALTER TABLE thread failed\n" + String.join("\n", log), e.getCause());
+            }
+            if (error != null) {
+                checkAlterError(error, log);
+            }
+            checkSavepointInvariant(log);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static void checkAlterError(String error, List<String> log) {
+        if (error.contains("is violated by some row")) {
+            return;
+        }
+        if (error.contains("canceling statement due to statement timeout")) {
+            throw new AssertionError("ALTER TABLE did not finish in " + STATEMENT_TIMEOUT_MS + " ms after A ended"
+                    + " (hang?)\n" + String.join("\n", log));
+        }
+        ExpectedErrors errors = new ExpectedErrors();
+        YSQLErrors.addTransactionErrors(errors);
+        if (errors.errorIsExpected(error)) {
+            throw new IgnoreMeException();
+        }
+        throw new AssertionError("ALTER TABLE failed: " + error + "\n" + String.join("\n", log));
+    }
+
+    // The constraint may exist only if every committed row satisfies it.
+    private void checkSavepointInvariant(List<String> log) throws SQLException {
+        try (Statement s = state.getConnection().createStatement();
+                ResultSet rs = s.executeQuery("SELECT (SELECT count(*) FROM pg_constraint WHERE conname = 'ysp_c'"
+                        + " AND conrelid = 'ysp.t'::regclass), (SELECT count(*) FROM ysp.t WHERE NOT (v < 10))")) {
+            rs.next();
+            int constraints = rs.getInt(1);
+            int violating = rs.getInt(2);
+            if (constraints > 0 && violating > 0) {
+                throw new AssertionError("CHECK (v < 10) was added while A held a violating row; " + violating
+                        + " committed rows now violate it\n" + String.join("\n", log));
+            }
+        }
+    }
+
+    private boolean objectLockingEnabled() {
+        if (objectLocking == null) {
+            try (Statement s = state.getConnection().createStatement();
+                    ResultSet rs = s.executeQuery("SHOW enable_object_locking_infra")) {
+                objectLocking = rs.next() && "on".equals(rs.getString(1));
+            } catch (SQLException e) {
+                objectLocking = false;
+            }
+        }
+        return objectLocking;
+    }
+
+    // ysp.t holds only (1, 1) and has no constraint; ysp.u is empty.
+    private void resetSavepointScratch() {
+        try (Statement s = state.getConnection().createStatement()) {
+            s.execute("CREATE SCHEMA IF NOT EXISTS ysp");
+            s.execute("CREATE TABLE IF NOT EXISTS ysp.t (k int PRIMARY KEY, v int)");
+            s.execute("CREATE TABLE IF NOT EXISTS ysp.u (k int PRIMARY KEY)");
+            s.execute("ALTER TABLE ysp.t DROP CONSTRAINT IF EXISTS ysp_c");
+            s.execute("DELETE FROM ysp.t WHERE k <> 1");
+            s.execute("INSERT INTO ysp.t VALUES (1, 1) ON CONFLICT (k) DO UPDATE SET v = 1");
+            s.execute("DELETE FROM ysp.u");
+        } catch (SQLException e) {
+            throw new IgnoreMeException(); // a concurrent DDL or a missing feature; try again next check
         }
     }
 

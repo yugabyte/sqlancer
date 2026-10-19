@@ -110,6 +110,18 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/34575
     public static boolean bugAnalyzeInReadOnlyTransactionFails;
 
+    // YSQL: a parallel worker did not see rows the leader still buffered under yb_speculatively_execute_pl_statements,
+    // so a scan in a plpgsql function missed the function's own inserts. Fixed on master by yugabyte-db 2e7a0e26528;
+    // set to true against older builds to skip the parallel own-writes check of YSQLScanGUCOracle.
+    // https://github.com/yugabyte/yugabyte-db/issues/33196
+    public static boolean bugParallelWorkerMissesBufferedWrites;
+
+    // YSQL: ROLLBACK TO SAVEPOINT released table locks taken before the savepoint, so a concurrent ALTER TABLE ADD
+    // CONSTRAINT no longer waited. Fixed on master by yugabyte-db 013f0e921e5; set to true against older builds to run
+    // the table-lock check of YSQLSkipLockedOracle without savepoints.
+    // https://github.com/yugabyte/yugabyte-db/issues/34734
+    public static boolean bugRollbackToSavepointReleasesTableLocks;
+
     private YugabyteBugs() {
     }
 

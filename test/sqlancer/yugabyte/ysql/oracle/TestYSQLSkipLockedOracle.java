@@ -158,4 +158,14 @@ public class TestYSQLSkipLockedOracle {
         }
         return out;
     }
+
+    @Test
+    public void everyVariantRollsBackToTheOuterSavepoint() {
+        for (int variant = 0; variant < 4; variant++) {
+            List<String> statements = YSQLSkipLockedOracle.savepointStatements(variant, "W");
+            assertEquals("SAVEPOINT a", statements.get(0));
+            assertTrue(statements.contains("W"));
+            assertTrue(statements.contains("ROLLBACK TO SAVEPOINT a"));
+        }
+    }
 }
