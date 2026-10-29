@@ -10,6 +10,8 @@ public final class YSQLErrors {
 
     public static void addKnownIssues(ExpectedErrors errors) {
         errors.add("Read time should NOT be specified for serializable isolation level");
+        // A serializable transaction that switches to read only mid-way (e.g. a nested BEGIN READ ONLY).
+        errors.add("Attempt to change effective isolation");
         errors.add("Table with identifier");
         errors.add("Restarting a DDL transaction not supported");
         errors.add("An I/O error occurred while sending to the backend");
@@ -147,6 +149,7 @@ public final class YSQLErrors {
         errors.add("Transaction conflicted");
         errors.add("current transaction is aborted, commands ignored until end of transaction block");
         errors.add("current transaction is expired or aborted");
+        errors.add("all acquired object locks have been released");
         // TRUNCATE/REFRESH MATERIALIZED VIEW/etc. against a relation that still has an open portal or cursor in the
         // same session - legitimate PG/YB rejection, not a bug.
         errors.add("because it is being used by active queries in this session");
@@ -162,6 +165,8 @@ public final class YSQLErrors {
         // Timeout errors
         errors.add("canceling statement due to statement timeout");
         errors.add("canceling statement due to lock timeout");
+        // Concurrent DDL: a DDL's object-lock wait runs out of statement_timeout.
+        errors.add("AcquireObjectLocksGlobal");
     }
 
     // Legitimate rejections of a SELECT ... FOR UPDATE/NO KEY UPDATE/SHARE/KEY SHARE [OF t] [NOWAIT | SKIP LOCKED]

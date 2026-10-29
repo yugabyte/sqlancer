@@ -281,6 +281,10 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
     @Override
     public void generateDatabase(YSQLGlobalState globalState) throws Exception {
         if (globalState.getDbmsSpecificOptions().createDatabases) {
+            // Bounds lock waits of the setup DDL too; prepareTables sets it again for the oracle phase.
+            ExpectedErrors setErrors = new ExpectedErrors();
+            YSQLErrors.addKnownIssues(setErrors);
+            globalState.executeStatement(new SQLQueryAdapter("SET SESSION statement_timeout = 15000;\n", setErrors));
             readFunctions(globalState);
             boolean isCatalogTest = CATALOG.equals(globalState.getDbmsSpecificOptions().oracle.get(0));
             int numTables = isCatalogTest ? Math.max(1, globalState.getDbmsSpecificOptions().catalogNumTables)
