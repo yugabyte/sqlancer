@@ -40,7 +40,9 @@ import sqlancer.yugabyte.ysql.gen.YSQLStorageProbeGenerator;
  * physical plan, never the logical result, so both runs must return identical (unordered) result sets. A mismatch
  * indicates a planner / pushdown wrong-results bug - the class of bug that has historically shipped in YugabyteDB's
  * batched-nested-loop join and bitmap-scan paths. With small probability a check instead verifies that a parallel scan
- * inside a plpgsql function sees the transaction's own inserts (checkParallelOwnWrites).
+ * inside a plpgsql function sees the transaction's own inserts (checkParallelOwnWrites), and with rather low
+ * probability that aggregates pushed down to DocDB match the same aggregates computed in the query layer
+ * (checkAggregatePushdown).
  */
 public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
 
@@ -124,6 +126,9 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             // out-of-range integer key takes, YB #34277), and drop DocKey lower/upper bounds on hash-sharded scans.
             { "yb_test_skip_binding_scan_keys=on" }, //
             { "yb_allow_dockey_bounds=off" }, //
+            // Scan every partition, so a DEFAULT or bounded partition that pruning wrongly skips shows its rows (YB
+            // #36208, #36209 on multi-column RANGE partitions).
+            { "enable_partition_pruning=off" }, //
     };
 
     // PostgreSQL 18 planner switches (plan-only, result-preserving), used in PostgreSQL-compatible mode (AMP)
@@ -138,7 +143,6 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             { "enable_group_by_reordering=off" }, //
             { "enable_distinct_reordering=off" }, //
             { "enable_self_join_elimination=off" }, //
-            { "enable_partition_pruning=off" }, //
             { "enable_partitionwise_join=on", "enable_partitionwise_aggregate=on" }, //
             { "enable_tidscan=off" }, //
             { "enable_async_append=off" }, //
@@ -169,6 +173,8 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             YSQLDataType.BIGINT, YSQLDataType.TEXT, YSQLDataType.VARCHAR, YSQLDataType.CHAR, YSQLDataType.DATE,
             YSQLDataType.TIME, YSQLDataType.TIMESTAMP, YSQLDataType.TIMESTAMPTZ, YSQLDataType.BOOLEAN,
             YSQLDataType.UUID, YSQLDataType.BYTEA, YSQLDataType.MONEY);
+    private static final EnumSet<YSQLDataType> INTEGER_TYPES = EnumSet.of(YSQLDataType.SMALLINT, YSQLDataType.INT,
+            YSQLDataType.BIGINT);
     private static final String UNIQUE_KEYS = "SELECT c.relname || chr(1) || a.attname FROM pg_index i"
             + " JOIN pg_class c ON c.oid = i.indrelid"
             + " JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]"
@@ -189,6 +195,9 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         YSQLErrors.addCommonFetchErrors(errors);
         YSQLErrors.addTransactionErrors(errors);
         YSQLErrors.addSubqueryErrors(errors);
+        if (YugabyteBugs.bugDistinctJoinPathkeyNotFound) {
+            errors.add("could not find pathkey item to sort");
+        }
     }
 
     // YugabyteDB mode uses all flips; PostgreSQL-compatible mode drops every flip that sets a yb_ parameter (it would
@@ -220,6 +229,10 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
             checkParallelOwnWrites();
             return;
         }
+        if (!state.isPgCompatible() && Randomly.getBooleanWithRatherLowProbability()) {
+            checkAggregatePushdown();
+            return;
+        }
         YSQLTables targetTables = state.getSchema().getRandomTableNonEmptyTables();
         List<YSQLColumn> columns = targetTables.getColumns();
         YSQLExpressionGenerator gen = new YSQLExpressionGenerator(state).setColumns(columns);
@@ -241,6 +254,9 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
                 .filter(YSQLMergeScanQueryGenerator::isCandidate).collect(Collectors.toList());
         if (!state.isPgCompatible() && !bucketTables.isEmpty() && Randomly.getBoolean()) {
             queryString = YSQLMergeScanQueryGenerator.generate(Randomly.fromList(bucketTables));
+        }
+        if (!state.isPgCompatible() && Randomly.getBooleanWithRatherLowProbability()) {
+            queryString = distinctJoinQuery(targetTables.getTables());
         }
         if (state.isPgCompatible() && Randomly.getBoolean()) {
             queryString = pgShapedQuery(targetTables.getTables());
@@ -296,6 +312,63 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
         return "SELECT " + groupList + ", count(*), count(" + a + "), min(" + a + "), max(" + a + "), array_agg(" + a
                 + " ORDER BY " + a + ") FROM " + table.getName() + " GROUP BY " + reversedList + " ORDER BY "
                 + groupList;
+    }
+
+    // SELECT DISTINCT over a join whose other side filters on an equality of two of its own columns. The planner makes
+    // that equality an equivalence class and may serve it with a distinct index scan whose pathkeys the Unique above it
+    // cannot find (YB #36402, #36013).
+    private String distinctJoinQuery(List<YSQLTable> tables) {
+        YSQLTable inner = Randomly.fromList(tables);
+        List<List<YSQLColumn>> pairs = inner.getColumns().stream().filter(c -> EXACT_TYPES.contains(c.getType()))
+                .collect(Collectors
+                        .groupingBy(c -> INTEGER_TYPES.contains(c.getType()) ? YSQLDataType.INT : c.getType()))
+                .values().stream().filter(group -> group.size() > 1).collect(Collectors.toList());
+        if (pairs.isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        List<YSQLColumn> pair = Randomly.extractNrRandomColumns(Randomly.fromList(pairs), 2);
+        String equality = "r." + pair.get(0).getName() + " = r." + pair.get(1).getName();
+        YSQLTable outer = Randomly.fromList(tables);
+        List<YSQLColumn> outerColumns = outer.getColumns().stream().filter(c -> EXACT_TYPES.contains(c.getType()))
+                .collect(Collectors.toList());
+        if (outerColumns.isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        String select = "SELECT DISTINCT l." + Randomly.fromList(outerColumns).getName()
+                + (Randomly.getBooleanWithRatherLowProbability() ? ", r." + pair.get(0).getName() : "");
+        if (Randomly.getBoolean()) {
+            return select + " FROM " + outer.getName() + " l JOIN " + inner.getName() + " r ON " + equality;
+        }
+        return select + " FROM " + outer.getName() + " l, " + inner.getName() + " r WHERE " + equality;
+    }
+
+    // Aggregates over a plain scan are pushed down to DocDB (Partial Aggregate); over an OFFSET 0 subquery they run in
+    // the query layer. Both must return the same values, including how they print (YB #36389, #36151).
+    private void checkAggregatePushdown() throws SQLException {
+        YSQLTable table = state.getSchema().getRandomTableOrBailout(t -> !t.isView());
+        List<YSQLColumn> exact = table.getColumns().stream().filter(c -> EXACT_TYPES.contains(c.getType()))
+                .filter(c -> !(YugabyteBugs.bugPushedMinMaxCharDropsPadding && c.getType() == YSQLDataType.CHAR))
+                .collect(Collectors.toList());
+        if (exact.isEmpty()) {
+            throw new IgnoreMeException();
+        }
+        YSQLColumn column = Randomly.fromList(exact);
+        String c = column.getFullQualifiedName();
+        String aggregates = "count(*), count(" + c + "), min(" + c + "), max(" + c + ")"
+                + (INTEGER_TYPES.contains(column.getType()) ? ", sum(" + c + ")" : "");
+        String where = "";
+        if (Randomly.getBoolean()) {
+            YSQLExpressionGenerator gen = new YSQLExpressionGenerator(state).setColumns(table.getColumns());
+            where = " WHERE " + YSQLVisitor.asString(gen.generateExpression(0, YSQLDataType.BOOLEAN));
+        }
+        String pushed = "SELECT " + aggregates + " FROM " + table.getName() + where;
+        // The subquery takes the table's name as its alias, so the qualified column names resolve in both queries.
+        String local = "SELECT " + aggregates + " FROM (SELECT * FROM " + table.getName() + where + " OFFSET 0) "
+                + table.getName();
+        capturePlan(pushed, "pushed down");
+        List<String> pushedResult = ComparatorHelper.getResultSetAllColumnsAsString(pushed, errors, state);
+        List<String> localResult = ComparatorHelper.getResultSetAllColumnsAsString(local, errors, state);
+        ComparatorHelper.assumeResultSetsAreEqual(pushedResult, localResult, pushed, List.of(local), state);
     }
 
     // AMP: the flipped run then reads its pages from the page server instead of shared buffers. Plain PostgreSQL

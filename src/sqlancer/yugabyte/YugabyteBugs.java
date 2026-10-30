@@ -122,6 +122,18 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/34734
     public static boolean bugRollbackToSavepointReleasesTableLocks;
 
+    // YSQL: MIN/MAX over a CHAR(n) column pushed down to DocDB return the value without its trailing blank padding,
+    // while the same aggregate in the query layer returns it padded. While this holds, the aggregate pushdown check of
+    // YSQLScanGUCOracle skips CHAR columns.
+    // https://github.com/yugabyte/yugabyte-db/issues/36389
+    public static boolean bugPushedMinMaxCharDropsPadding = true;
+
+    // YSQL: SELECT DISTINCT over a join fails with "could not find pathkey item to sort" when the other table filters
+    // on an equality of two of its own columns that an index covers and distinct pushdown is on. While this holds,
+    // YSQLScanGUCOracle expects that error.
+    // https://github.com/yugabyte/yugabyte-db/issues/36402
+    public static boolean bugDistinctJoinPathkeyNotFound = true;
+
     private YugabyteBugs() {
     }
 

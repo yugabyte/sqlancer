@@ -1,6 +1,8 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import sqlancer.Randomly;
 import sqlancer.common.query.ExpectedErrors;
@@ -15,11 +17,12 @@ import sqlancer.yugabyte.ysql.YSQLGlobalState;
  */
 public final class YSQLPartitionGenerator {
 
-    // name, strategy (h/l/r), number of key columns, type of the first key column ('' for an expression key)
+    // name, strategy (h/l/r), number of key columns, chr(2)-separated types of the key columns ('' for an expression)
     private static final String PARTITIONED = "SELECT c.relname || chr(1) || p.partstrat::text || chr(1) || p.partnatts"
-            + " || chr(1) || coalesce(format_type(a.atttypid, NULL), '') FROM pg_partitioned_table p"
-            + " JOIN pg_class c ON c.oid = p.partrelid"
-            + " LEFT JOIN pg_attribute a ON a.attrelid = p.partrelid AND a.attnum = p.partattrs[0]"
+            + " || chr(1) || coalesce((SELECT string_agg(coalesce(format_type(a.atttypid, NULL), ''), chr(2)"
+            + " ORDER BY k.n) FROM unnest(p.partattrs::int2[]) WITH ORDINALITY k(attnum, n)"
+            + " LEFT JOIN pg_attribute a ON a.attrelid = p.partrelid AND a.attnum = k.attnum), '')"
+            + " FROM pg_partitioned_table p JOIN pg_class c ON c.oid = p.partrelid"
             + " WHERE c.relnamespace = 'public'::regnamespace";
     private static final String PARTITIONS = "SELECT p.relname || chr(1) || c.relname FROM pg_inherits i"
             + " JOIN pg_class c ON c.oid = i.inhrelid JOIN pg_class p ON p.oid = i.inhparent"
@@ -68,8 +71,8 @@ public final class YSQLPartitionGenerator {
 
     private static String bound(String... parent) {
         String strategy = parent[1];
-        int keys = Integer.parseInt(parent[2]);
-        String type = parent[3];
+        String[] types = parent[3].split("\\u0002", -1);
+        String type = types[0];
         if ("h".equals(strategy)) {
             int modulus = Randomly.fromOptions(2, 4, 8);
             return "FOR VALUES WITH (MODULUS " + modulus + ", REMAINDER " + Randomly.getNotCachedInteger(0, modulus)
@@ -78,7 +81,7 @@ public final class YSQLPartitionGenerator {
         if (Randomly.getBooleanWithRatherLowProbability()) {
             return "DEFAULT";
         }
-        boolean numeric = type.matches("smallint|integer|bigint|numeric");
+        boolean numeric = isNumeric(type);
         boolean text = type.matches("text|character varying|character");
         if ("l".equals(strategy) && (numeric || text)) {
             StringBuilder sb = new StringBuilder("FOR VALUES IN (");
@@ -88,15 +91,43 @@ public final class YSQLPartitionGenerator {
             }
             return sb.append(")").toString();
         }
-        if ("r".equals(strategy) && keys == 1 && numeric) {
-            long from = Randomly.getNotCachedInteger(-100, 100);
-            return "FOR VALUES FROM (" + from + ") TO (" + (from + Randomly.getNotCachedInteger(1, 100)) + ")";
-        }
         if ("r".equals(strategy)) {
-            String min = String.join(", ", Collections.nCopies(keys, "MINVALUE"));
-            String max = String.join(", ", Collections.nCopies(keys, "MAXVALUE"));
-            return "FOR VALUES FROM (" + min + ") TO (" + max + ")";
+            return rangeBound(types);
         }
         return "DEFAULT";
+    }
+
+    private static boolean isNumeric(String type) {
+        return type.matches("smallint|integer|bigint|numeric");
+    }
+
+    // Values for a prefix of the numeric leading key columns, then MINVALUE or MAXVALUE for the rest, e.g.
+    // FROM (13, 0) TO (19, MAXVALUE). Multi-column bounds like these are where pruning has skipped partitions and the
+    // DEFAULT partition (YB #36208, #36209, #36140). A later column with an equal first value can make the range
+    // empty, which CREATE rejects.
+    private static String rangeBound(String... types) {
+        int numericPrefix = 0;
+        while (numericPrefix < types.length && isNumeric(types[numericPrefix])) {
+            numericPrefix++;
+        }
+        int values = numericPrefix == 0 ? 0 : (int) Randomly.getNotCachedInteger(1, numericPrefix + 1);
+        boolean tail = values < types.length;
+        List<String> from = new ArrayList<>();
+        List<String> to = new ArrayList<>();
+        for (int i = 0; i < values; i++) {
+            long lower = Randomly.getNotCachedInteger(-100, 100);
+            from.add(String.valueOf(lower));
+            if (i == 0) {
+                to.add(String.valueOf(lower + Randomly.getNotCachedInteger(tail || values > 1 ? 0 : 1, 100)));
+            } else {
+                to.add(String.valueOf(Randomly.getNotCachedInteger(-100, 100)));
+            }
+        }
+        // Every bound after MINVALUE or MAXVALUE must repeat it.
+        from.addAll(Collections.nCopies(types.length - values,
+                values == 0 ? "MINVALUE" : Randomly.fromOptions("MINVALUE", "MAXVALUE")));
+        to.addAll(Collections.nCopies(types.length - values,
+                values == 0 ? "MAXVALUE" : Randomly.fromOptions("MINVALUE", "MAXVALUE")));
+        return "FOR VALUES FROM (" + String.join(", ", from) + ") TO (" + String.join(", ", to) + ")";
     }
 }
