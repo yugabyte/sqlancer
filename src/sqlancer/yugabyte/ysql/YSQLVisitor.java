@@ -10,6 +10,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLCollate;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
@@ -90,6 +91,8 @@ public interface YSQLVisitor {
     void visit(YSQLInOperation op);
 
     void visit(YSQLPostfixText op);
+
+    void visit(YSQLCollate op);
 
     void visit(YSQLAggregate op);
 
@@ -176,6 +179,8 @@ public interface YSQLVisitor {
             visit((YSQLAggregate) expression);
         } else if (expression instanceof YSQLPostfixText) {
             visit((YSQLPostfixText) expression);
+        } else if (expression instanceof YSQLCollate) {
+            visit((YSQLCollate) expression);
         } else if (expression instanceof YSQLSimilarTo) {
             visit((YSQLSimilarTo) expression);
         } else if (expression instanceof YSQLLikeOperation) {

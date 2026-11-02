@@ -204,7 +204,13 @@ public class YSQLScanGUCOracle implements TestOracle<YSQLGlobalState> {
     // only raise "unrecognized configuration parameter") and adds the PostgreSQL-only ones.
     static List<String[]> flipsFor(String[][] flips, String[][] pgOnlyFlips, boolean pgCompatible) {
         if (!pgCompatible) {
-            return Arrays.asList(flips);
+            if (!YugabyteBugs.bugPrimaryKeyDecodeFromIndexReturnsKeyBytes) {
+                return Arrays.asList(flips);
+            }
+            return Arrays.stream(flips)
+                    .filter(flip -> Arrays.stream(flip)
+                            .noneMatch(assignment -> assignment.startsWith("yb_enable_primary_key_decode_from_index")))
+                    .collect(Collectors.toList());
         }
         List<String[]> result = Arrays.stream(flips)
                 .filter(flip -> Arrays.stream(flip).noneMatch(assignment -> assignment.startsWith("yb_")))

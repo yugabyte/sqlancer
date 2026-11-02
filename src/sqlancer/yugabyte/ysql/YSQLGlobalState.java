@@ -23,6 +23,9 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
     private final Map<String, Character> functionsAndTypes = new HashMap<>();
     private List<String> operators = Collections.emptyList();
     private List<String> collates = Collections.emptyList();
+    // Column and expression collations: the deterministic C-like and ICU collations predefined on this server.
+    private List<String> columnCollations = Collections.emptyList();
+    private List<String> icuCollations = Collections.emptyList();
     private List<String> opClasses = Collections.emptyList();
     // Whether the pgvector extension can be created on this cluster. Detected once at connection setup so the
     // VECTOR_TEST action is skipped entirely on builds without pgvector instead of emitting guaranteed-failing SQL.
@@ -38,6 +41,7 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
             this.opClasses = getOpclasses(getConnection());
             this.operators = getOperators(getConnection());
             this.collates = getCollnames(getConnection());
+            loadColumnCollations(getConnection());
             this.vectorAvailable = checkVectorAvailable(getConnection());
             this.debugAssertions = checkDebugAssertions(getConnection());
         } catch (SQLException e) {
@@ -89,6 +93,23 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
         return opClasses;
     }
 
+    private void loadColumnCollations(SQLConnection con) throws SQLException {
+        List<String> all = new ArrayList<>();
+        List<String> icu = new ArrayList<>();
+        try (Statement s = con.createStatement(); ResultSet rs = s.executeQuery(
+                "SELECT collname, collprovider FROM pg_collation WHERE collname IN ('C', 'POSIX', 'und-x-icu', "
+                        + "'en-US-x-icu', 'sv-SE-x-icu', 'tr-TR-x-icu', 'da-DK-x-icu') OR collname LIKE '%utf8'")) {
+            while (rs.next()) {
+                all.add(rs.getString(1));
+                if ("i".equals(rs.getString(2))) {
+                    icu.add(rs.getString(1));
+                }
+            }
+        }
+        columnCollations = all;
+        icuCollations = icu;
+    }
+
     private List<String> getOpclasses(SQLConnection con) throws SQLException {
         List<String> opClasses = new ArrayList<>();
         try (Statement s = con.createStatement()) {
@@ -127,6 +148,14 @@ public class YSQLGlobalState extends SQLGlobalState<YSQLOptions, YSQLSchema> {
 
     public String getRandomCollate() {
         return Randomly.fromList(collates);
+    }
+
+    public List<String> getColumnCollations() {
+        return columnCollations;
+    }
+
+    public List<String> getIcuCollations() {
+        return icuCollations;
     }
 
     public List<String> getOpClasses() {

@@ -6,6 +6,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLBetweenOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLCollate;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
 import sqlancer.yugabyte.ysql.ast.YSQLCte;
@@ -123,6 +124,12 @@ public final class YSQLExpectedValueVisitor implements YSQLVisitor {
 
     @Override
     public void visit(YSQLPostfixText op) {
+        print(op);
+        visit(op.getExpr());
+    }
+
+    @Override
+    public void visit(YSQLCollate op) {
         print(op);
         visit(op.getExpr());
     }

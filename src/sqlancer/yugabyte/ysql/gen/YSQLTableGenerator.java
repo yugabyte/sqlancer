@@ -11,6 +11,7 @@ import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.yugabyte.YugabyteBugs;
 import sqlancer.yugabyte.ysql.YSQLErrors;
 import sqlancer.yugabyte.ysql.YSQLGlobalState;
+import sqlancer.yugabyte.ysql.YSQLOptions.YSQLOracleFactory;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLColumn;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLDataType;
 import sqlancer.yugabyte.ysql.YSQLSchema.YSQLTable;
@@ -172,12 +173,23 @@ public class YSQLTableGenerator {
         sb.append(" ");
         YSQLDataType type = YSQLDataType.getRandomType();
         boolean serial = YSQLCommon.appendDataType(type, sb, true, generateOnlyKnown, globalState.getCollates());
+        appendCollation(type);
         YSQLColumn c = new YSQLColumn(name, type);
         c.setTable(table);
         columnsToBeAdded.add(c);
         sb.append(" ");
         if (Randomly.getBoolean()) {
             createColumnConstraint(type, serial);
+        }
+    }
+
+    // A collated text column, including a key column, stores its keys in DocDB as collation sort keys.
+    private void appendCollation(YSQLDataType type) {
+        if ((type == YSQLDataType.TEXT || type == YSQLDataType.VARCHAR || type == YSQLDataType.CHAR)
+                && globalState.getDbmsSpecificOptions().testCollations
+                && !globalState.getDbmsSpecificOptions().oracle.contains(YSQLOracleFactory.PQS)
+                && !globalState.getColumnCollations().isEmpty() && Randomly.getBoolean()) {
+            sb.append(" COLLATE \"").append(Randomly.fromList(globalState.getColumnCollations())).append("\"");
         }
     }
 

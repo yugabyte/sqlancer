@@ -1,5 +1,6 @@
 package sqlancer.yugabyte.ysql.gen;
 
+import java.util.EnumSet;
 import java.util.List;
 
 import sqlancer.IgnoreMeException;
@@ -206,11 +207,18 @@ public class YSQLAlterTableGenerator {
                     sb.append("SET DATA ");
                 }
                 sb.append("TYPE ");
-                YSQLDataType newType = YSQLDataType.getRandomType();
+                // Changing only the length or precision keeps the stored values, so the table and the indexes on the
+                // column (expression and partial ones too) may be kept instead of rebuilt.
+                boolean modifierOnly = EnumSet
+                        .of(YSQLDataType.VARCHAR, YSQLDataType.CHAR, YSQLDataType.NUMERIC, YSQLDataType.DECIMAL)
+                        .contains(column.getType()) && Randomly.getBoolean();
+                YSQLDataType newType = modifierOnly ? column.getType() : YSQLDataType.getRandomType();
                 YSQLCommon.appendDataType(newType, sb, false, false, globalState.getCollates());
-                if (Randomly.getBoolean()) {
+                if (!modifierOnly && Randomly.getBoolean()) {
                     sb.append(" USING ").append(column.getName()).append("::text::").append(getTypeName(newType));
                 }
+                errors.add("value too long for type");
+                errors.add("numeric field overflow");
                 errors.add("cannot alter type of a column used by");
                 errors.add("cannot alter type of a column used in a policy definition");
                 errors.add("cannot cast");

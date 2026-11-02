@@ -134,6 +134,18 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/36402
     public static boolean bugDistinctJoinPathkeyNotFound = true;
 
+    // YSQL: a comparison on an ICU-collated text column with an explicit C-like collation (e.g. v > 'M' COLLATE "C")
+    // is pushed to DocDB as a Storage Filter of an index scan and drops matching rows. While this holds, the
+    // expression generator writes explicit COLLATE clauses only with ICU collations.
+    // https://github.com/yugabyte/yugabyte-db/issues/36631
+    public static boolean bugPushedFilterIgnoresExplicitCollation = true;
+
+    // YSQL: with yb_enable_primary_key_decode_from_index = on, an Index Only Scan on a secondary index returns the
+    // stored key bytes of a collated text range primary key and drops the padding of a char(n) primary key. While this
+    // holds, YSQLScanGUCOracle and YSQLDQPOracle do not turn that setting on.
+    // https://github.com/yugabyte/yugabyte-db/issues/36506
+    public static boolean bugPrimaryKeyDecodeFromIndexReturnsKeyBytes = true;
+
     private YugabyteBugs() {
     }
 

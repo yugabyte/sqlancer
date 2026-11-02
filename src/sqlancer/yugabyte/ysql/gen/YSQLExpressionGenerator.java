@@ -30,6 +30,7 @@ import sqlancer.yugabyte.ysql.ast.YSQLBinaryLogicalOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLBinaryRangeOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLCaseExpression;
 import sqlancer.yugabyte.ysql.ast.YSQLCastOperation;
+import sqlancer.yugabyte.ysql.ast.YSQLCollate;
 import sqlancer.yugabyte.ysql.ast.YSQLColumnValue;
 import sqlancer.yugabyte.ysql.ast.YSQLConcatOperation;
 import sqlancer.yugabyte.ysql.ast.YSQLConstant;
@@ -587,7 +588,29 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     private YSQLExpression generateComparison(int depth, YSQLDataType dataType) {
         YSQLExpression leftExpr = generateExpression(depth + 1, dataType);
         YSQLExpression rightExpr = generateExpression(depth + 1, dataType);
+        String collation = explicitCollation(dataType);
+        if (collation != null) {
+            if (Randomly.getBoolean()) {
+                leftExpr = new YSQLCollate(leftExpr, collation);
+            } else {
+                rightExpr = new YSQLCollate(rightExpr, collation);
+            }
+        }
         return getComparison(leftExpr, rightExpr);
+    }
+
+    // An explicit collation overrides the column's, so an index or storage filter built on the column's collation
+    // keys cannot answer the comparison as is.
+    private String explicitCollation(YSQLDataType dataType) {
+        if (expectedResult || globalState == null
+                || dataType != YSQLDataType.TEXT && dataType != YSQLDataType.VARCHAR && dataType != YSQLDataType.CHAR
+                || !globalState.getDbmsSpecificOptions().testCollations
+                || !Randomly.getBooleanWithRatherLowProbability()) {
+            return null;
+        }
+        List<String> collations = YugabyteBugs.bugPushedFilterIgnoresExplicitCollation ? globalState.getIcuCollations()
+                : globalState.getColumnCollations();
+        return collations.isEmpty() ? null : Randomly.fromList(collations);
     }
 
     private YSQLExpression getComparison(YSQLExpression leftExpr, YSQLExpression rightExpr) {
