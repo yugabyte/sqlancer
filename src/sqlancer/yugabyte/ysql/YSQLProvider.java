@@ -33,6 +33,7 @@ import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
 import sqlancer.common.query.SQLancerResultSet;
+import sqlancer.yugabyte.ysql.gen.YSQLAddColumnDefaultGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterDatabaseGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAlterTableGenerator;
 import sqlancer.yugabyte.ysql.gen.YSQLAnalyzeGenerator;
@@ -270,6 +271,9 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         case INDEX_CHECK:
             // yb_index_check() is YugabyteDB-only.
             nrPerformed = isPgCompat ? 0 : r.getInteger(0, 2);
+            break;
+        case ADD_COLUMN_DEFAULT_CHECK:
+            nrPerformed = r.getInteger(0, 2);
             break;
         default:
             throw new AssertionError(a);
@@ -788,7 +792,8 @@ public class YSQLProvider extends SQLProviderAdapter<YSQLGlobalState, YSQLOption
         CREATE_STATISTICS(YSQLStatisticsGenerator::insert), //
         DROP_STATISTICS(YSQLStatisticsGenerator::remove), //
         DDL_TRANSACTION(YSQLDdlTransactionGenerator::create), //
-        INDEX_CHECK(YSQLIndexCheckGenerator::create);
+        INDEX_CHECK(YSQLIndexCheckGenerator::create), //
+        ADD_COLUMN_DEFAULT_CHECK(YSQLAddColumnDefaultGenerator::create);
 
         private final SQLQueryProvider<YSQLGlobalState> sqlQueryProvider;
 

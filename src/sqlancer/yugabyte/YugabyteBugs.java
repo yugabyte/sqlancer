@@ -152,6 +152,11 @@ public final class YugabyteBugs {
     // array ANY/ALL comparisons. https://github.com/yugabyte/yugabyte-db/issues/35030
     public static boolean bugArrayQuantifiedComparisonBoundAsScalar;
 
+    // YSQL: ALTER TABLE ADD COLUMN ... DEFAULT f(), with f a VOLATILE SQL function that planning inlines to a constant,
+    // left the existing rows NULL. Fixed on master by yugabyte-db 359e090b3c6; set to true against older builds to
+    // expect the error YSQLAddColumnDefaultGenerator raises. https://github.com/yugabyte/yugabyte-db/issues/37663
+    public static boolean bugAddColumnInlinedSqlDefaultReadsNull;
+
     private YugabyteBugs() {
     }
 
