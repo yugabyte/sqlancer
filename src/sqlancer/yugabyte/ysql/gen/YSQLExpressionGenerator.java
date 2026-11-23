@@ -454,9 +454,13 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             // PQS requires Java-side expected values.
             validOptions.remove(BooleanExpression.ROW_COMPARISON);
             validOptions.remove(BooleanExpression.HASH_CODE_RANGE);
+            validOptions.remove(BooleanExpression.ARRAY_QUANTIFIED_COMPARISON);
         }
         if (getComparisonSafeColumns().isEmpty()) {
             validOptions.remove(BooleanExpression.ORM_PREDICATE);
+        }
+        if (YugabyteBugs.bugArrayQuantifiedComparisonBoundAsScalar) {
+            validOptions.remove(BooleanExpression.ARRAY_QUANTIFIED_COMPARISON);
         }
         BooleanExpression option = Randomly.fromList(validOptions);
         switch (option) {
@@ -538,6 +542,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             return generateQuantifiedComparison(depth);
         case ROW_COMPARISON:
             return generateRowComparison(depth);
+        case ARRAY_QUANTIFIED_COMPARISON:
+            return generateArrayQuantifiedComparison(depth);
         case HASH_CODE_RANGE:
             return generateHashCodeRange();
         case IS_JSON:
@@ -805,6 +811,34 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
         return new YSQLQuantifiedComparison(generateExpression(depth + 1, qType), createSubquerySelect(1, qType),
                 YSQLQuantifiedComparison.ComparisonOperator.getRandom(),
                 YSQLQuantifiedComparison.QuantifierType.getRandom());
+    }
+
+    // An index condition such as "c >= 0" qualifies c for the index scan, which then bound "c > ANY (ARRAY[...])" on
+    // the same column as a scalar range bound (YB #35030, #37237).
+    private YSQLExpression generateArrayQuantifiedComparison(int depth) {
+        List<YSQLColumn> keyColumns = getComparisonSafeColumns();
+        YSQLColumn column = keyColumns.isEmpty() ? null : Randomly.fromList(keyColumns);
+        YSQLDataType type = column == null ? getComparisonSafeType() : column.getType();
+        YSQLExpression left = column == null ? generateExpression(depth + 1, type)
+                : YSQLColumnValue.create(column, null);
+        List<YSQLExpression> elements = new ArrayList<>();
+        int nrElements = Randomly.getBooleanWithRatherLowProbability() ? 0 : Randomly.smallNumber() + 1;
+        for (int i = 0; i < nrElements; i++) {
+            elements.add(Randomly.getBooleanWithRatherLowProbability() ? YSQLConstant.createNullConstant()
+                    : generateConstant(r, type));
+        }
+        YSQLExpression comparison = new YSQLQuantifiedComparison(left, elements, YSQLCompoundDataType.create(type),
+                YSQLQuantifiedComparison.ComparisonOperator.getRandom(),
+                YSQLQuantifiedComparison.QuantifierType.getRandom());
+        if (column == null || Randomly.getBoolean()) {
+            return comparison;
+        }
+        YSQLExpression qualifier = Randomly.getBoolean()
+                ? new YSQLBinaryComparisonOperation(left, generateConstant(r, type),
+                        YSQLBinaryComparisonOperation.YSQLBinaryComparisonOperator.getRandom())
+                : YSQLPostfixOperation.create(left, YSQLPostfixOperation.PostfixOperator.IS_NOT_NULL);
+        return new YSQLBinaryLogicalOperation(qualifier, comparison,
+                YSQLBinaryLogicalOperation.BinaryLogicalOperator.AND);
     }
 
     private YSQLExpression generateCaseExpression(int depth, YSQLDataType resultType) {
@@ -1506,7 +1540,8 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
     private enum BooleanExpression {
         POSTFIX_OPERATOR, NOT, BINARY_LOGICAL_OPERATOR, BINARY_COMPARISON, FUNCTION, CAST, BETWEEN, IN_OPERATION,
         SIMILAR_TO, POSIX_REGEX, LIKE, BINARY_RANGE_COMPARISON, ARRAY_OPERATION, TIMESTAMP_EXTRACT, CASE_EXPRESSION,
-        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON, ROW_COMPARISON, HASH_CODE_RANGE, ORM_PREDICATE, IS_JSON
+        EXISTS_SUBQUERY, IN_SUBQUERY, QUANTIFIED_COMPARISON, ROW_COMPARISON, HASH_CODE_RANGE, ORM_PREDICATE, IS_JSON,
+        ARRAY_QUANTIFIED_COMPARISON
     }
 
     private enum RangeExpression {

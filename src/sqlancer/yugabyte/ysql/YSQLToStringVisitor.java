@@ -646,7 +646,15 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
         sb.append(" ");
         sb.append(op.getQuantifier().name());
         sb.append(" (");
-        visit(op.getSubquery());
+        if (op.isArray()) {
+            sb.append("ARRAY[");
+            visit(op.getArrayElements());
+            sb.append("]::");
+            appendType(op.getArrayElementType());
+            sb.append("[]");
+        } else {
+            visit(op.getSubquery());
+        }
         sb.append(")");
     }
 
@@ -736,7 +744,10 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
     }
 
     private void appendType(YSQLCastOperation cast) {
-        YSQLCompoundDataType compoundType = cast.getCompoundType();
+        appendType(cast.getCompoundType());
+    }
+
+    private void appendType(YSQLCompoundDataType compoundType) {
         switch (compoundType.getDataType()) {
         case BOOLEAN:
             sb.append("BOOLEAN");
@@ -868,7 +879,7 @@ public final class YSQLToStringVisitor extends ToStringVisitor<YSQLExpression> i
             sb.append("BOOLEAN[]");
             break;
         default:
-            throw new AssertionError(cast.getType());
+            throw new AssertionError(compoundType.getDataType());
         }
         Optional<Integer> size = compoundType.getSize();
         if (size.isPresent()) {

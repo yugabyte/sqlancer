@@ -146,6 +146,12 @@ public final class YugabyteBugs {
     // https://github.com/yugabyte/yugabyte-db/issues/36506
     public static boolean bugPrimaryKeyDecodeFromIndexReturnsKeyBytes = true;
 
+    // YSQL: an index condition on a key column (e.g. k >= 0, or h = 1 on a hash key) let the index scan bind a
+    // non-equality "k > ANY (ARRAY[...])" on the same column as a scalar range bound, returning wrong rows or crashing
+    // the backend. Fixed on master by yugabyte-db a3581e32081; set to true against older builds to stop generating
+    // array ANY/ALL comparisons. https://github.com/yugabyte/yugabyte-db/issues/35030
+    public static boolean bugArrayQuantifiedComparisonBoundAsScalar;
+
     private YugabyteBugs() {
     }
 
