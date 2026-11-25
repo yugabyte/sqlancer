@@ -132,6 +132,14 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
                 generateExpression(depth + 1, YSQLDataType.INTERVAL), op, leftType);
     }
 
+    private YSQLExpression generateAge(int depth) {
+        YSQLDataType argType = YugabyteBugs.bugAgeTimestamptzPushdownCrash || Randomly.getBoolean()
+                ? YSQLDataType.TIMESTAMP : YSQLDataType.TIMESTAMPTZ;
+        YSQLExpression first = filterColumns(argType).isEmpty() || Randomly.getBooleanWithRatherLowProbability()
+                ? generateExpression(depth + 1, argType) : createColumnOfType(argType);
+        return new YSQLFunction("age", YSQLDataType.INTERVAL, first, generateExpression(depth + 1, argType));
+    }
+
     private static YSQLCompoundDataType getCompoundDataType(YSQLDataType type) {
         switch (type) {
         case BOOLEAN:
@@ -967,6 +975,9 @@ public class YSQLExpressionGenerator implements ExpressionGenerator<YSQLExpressi
             case INTERVAL:
                 if (depth < maxDepth && Randomly.getBooleanWithSmallProbability()) {
                     return dateIntervalArithmetic(depth, YSQLDataType.INTERVAL);
+                }
+                if (depth < maxDepth && !expectedResult && Randomly.getBooleanWithSmallProbability()) {
+                    return generateAge(depth);
                 }
                 return generateConstant(r, dataType);
             case TIMESTAMPTZ:

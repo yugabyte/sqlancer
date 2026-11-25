@@ -157,6 +157,12 @@ public final class YugabyteBugs {
     // expect the error YSQLAddColumnDefaultGenerator raises. https://github.com/yugabyte/yugabyte-db/issues/37663
     public static boolean bugAddColumnInlinedSqlDefaultReadsNull;
 
+    // YSQL: age(timestamptz, timestamptz) is IMMUTABLE but reads the session TimeZone, so a filter using it was pushed
+    // to DocDB, which has no session TimeZone, and the tserver crashed with SIGSEGV. Fixed on master by yugabyte-db
+    // fd5bdcfd104; set to true against older builds to generate only age(timestamp, timestamp).
+    // https://github.com/yugabyte/yugabyte-db/issues/35973
+    public static boolean bugAgeTimestamptzPushdownCrash;
+
     private YugabyteBugs() {
     }
 
