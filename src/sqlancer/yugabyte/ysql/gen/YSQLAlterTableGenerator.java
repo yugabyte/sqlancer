@@ -294,7 +294,7 @@ public class YSQLAlterTableGenerator {
                     if (Randomly.getBoolean()) {
                         sb.append(" (START WITH ").append(Randomly.getNotCachedInteger(1, 100)).append(")");
                     }
-                    errors.add("column is already an identity column");
+                    errors.add("is already an identity column");
                     errors.add("identity column type must be smallint, integer, or bigint");
                 } else {
                     throw new IgnoreMeException();

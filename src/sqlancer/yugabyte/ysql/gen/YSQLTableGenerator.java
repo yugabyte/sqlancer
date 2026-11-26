@@ -233,6 +233,7 @@ public class YSQLTableGenerator {
             if (Randomly.getBoolean()) {
                 sb.append(globalState.getRandomOpclass());
                 errors.add("does not exist for access method");
+                errors.add("could not use operator class");
             }
         }
         sb.append(")");

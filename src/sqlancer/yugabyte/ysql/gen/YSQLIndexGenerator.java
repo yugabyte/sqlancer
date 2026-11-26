@@ -81,6 +81,7 @@ public final class YSQLIndexGenerator {
                     sb.append(globalState.getRandomOpclass());
                     errors.add("does not accept");
                     errors.add("does not exist for access method");
+                    errors.add("could not use operator class");
                 }
                 if (Randomly.getBoolean()) {
                     sb.append(" ");
